@@ -95,6 +95,39 @@ test("near-antipodal pairs use the convergent ellipsoidal fallback", () => {
   assert.ok(Math.abs(result.distanceMetres - 19944127.420750458) < 0.001);
 });
 
+test("near-antipodal route ambiguity is explicit and still closes on target", () => {
+  const start = { latitude: 43.139205363724, longitude: 0 };
+  const end = {
+    latitude: -43.13920536372438,
+    longitude: 179.55910699284908,
+  };
+  const inverse = inverseGeodesic(start, end);
+  const destination = directGeodesic(
+    start,
+    inverse.initialBearingDegrees,
+    inverse.distanceMetres,
+  );
+
+  assert.equal(inverse.ambiguous, true);
+  assert.ok(Math.abs(destination.latitude - end.latitude) <= 1e-12);
+  assert.ok(
+    angularDifference(destination.longitude, end.longitude) <= 1e-12,
+  );
+});
+
+test("cut-locus sensitivity marks a closing Vincenty route as ambiguous", () => {
+  const result = inverseGeodesic(
+    { latitude: 86.890600409059, longitude: 0 },
+    {
+      latitude: -86.89060040905908,
+      longitude: 179.9671819225338,
+    },
+  );
+
+  assert.equal(result.solver, "vincenty-inverse");
+  assert.equal(result.ambiguous, true);
+});
+
 test("inverse and direct geodesic calculations round-trip", async () => {
   for (const vector of (await referenceVectors()).filter(
     (item) => item.initialBearingDegrees !== null,
@@ -114,6 +147,24 @@ test("inverse and direct geodesic calculations round-trip", async () => {
       `${vector.id}: longitude`,
     );
   }
+});
+
+test("sub-millimetre longitude differences preserve floating-point precision", () => {
+  const start = { latitude: 0, longitude: 0 };
+  const end = { latitude: 0, longitude: 1e-9 };
+  const inverse = inverseGeodesic(start, end);
+  const expectedDistance = 6_378_137 * 1e-9 * Math.PI / 180;
+
+  assert.ok(
+    Math.abs(inverse.distanceMetres - expectedDistance) <= 1e-15,
+  );
+  const destination = directGeodesic(
+    start,
+    inverse.initialBearingDegrees,
+    inverse.distanceMetres,
+  );
+  assert.ok(Math.abs(destination.latitude) <= 1e-18);
+  assert.ok(Math.abs(destination.longitude - end.longitude) <= 1e-18);
 });
 
 test("geodesic distance is symmetric and direct reconstruction stays within 1 mm", () => {

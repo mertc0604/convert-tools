@@ -137,6 +137,11 @@ bu sonucun API'ye aktarılan ondalık gösterimini kesin kesir olarak taşır;
 sonraki birim değişikliklerinde `distance.exactValue` kullanılarak ilave
 yuvarlama zincire sokulmaz.
 
+`ambiguous: true`, antipodal kesim bölgesinde aynı sayısal doğruluk zarfına
+giren birden fazla doğrulanmış rota bulunduğunu bildirir. Seçilen azimut
+`direct` hesabıyla hedefe kadar kapanır; çağıran uygulama bu bayrağı
+operatörden gizlememelidir.
+
 ## Harita çizgisi uzunluğu
 
 Her ardışık çift ayrı WGS 84 geodezik segment olarak ölçülür:

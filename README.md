@@ -121,6 +121,11 @@ console.log(result.distanceMetres);
 console.log(result.initialBearingDegrees);
 ```
 
+`ambiguous: true`, antipodal kesim bölgesinde sayısal doğruluk sınırı içinde
+birden fazla rota bulunduğunu belirtir. Mesafe ve seçilen rota hedefe kadar
+doğrulanır; fakat operasyonel kullanımda çağıran uygulama bu bayrağı
+görünür kılmalı ve tek bir azimutu kesinmiş gibi sunmamalıdır.
+
 ### Hesaplanan hattı haritada çizme
 
 `sampleGeodesicPath`, inverse çözümün bulduğu aynı kısa geodezik üzerinde eşit
@@ -259,8 +264,11 @@ Harita ölçümü WGS 84 dönel elipsoidi üzerinde inverse/direct geodezik çö
 Normal çiftlerde hızlı iteratif inverse çözüm, antipodale yakın çiftlerde
 direct çözüm ve sönümlü sayısal atış yedeği kullanılır. Kalıcı test kümesindeki
 ekvator, antimeridyen, kutup ve antipodal vektörler bağımsız referanslara göre
-`1 mm` toleransla doğrulanır. Çok parçalı toplamda Neumaier telafili toplama
-kullanılır.
+`1 mm` toleransla doğrulanır. Ayrıca GeographicLib'in 500.000 resmî WGS 84
+vektörünün tamamında en büyük mesafe farkı `0.075847 mm`, en büyük
+inverse/direct hedef kapanması `0.000635 mm` ölçülmüştür. Ayrıntılar
+[`docs/GEODESIC_VALIDATION.md`](docs/GEODESIC_VALIDATION.md) belgesindedir.
+Çok parçalı toplamda Neumaier telafili toplama kullanılır.
 
 Bir boylam derecesinin fiziksel uzunluğu enleme bağlıdır: ekvatorda en büyük,
 kutuplara yaklaştıkça sıfıra yakın olur. Aynı kutup noktasında farklı yazılmış

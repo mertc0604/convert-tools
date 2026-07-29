@@ -15,6 +15,10 @@ public record GeoPoint(double latitude, double longitude) {
     }
 
     public static double normalizeLongitude(double longitude) {
+        if (longitude >= -180 && longitude <= 180) {
+            return longitude;
+        }
+
         double normalized = ((longitude + 180) % 360 + 360) % 360 - 180;
         return normalized == -180 && longitude > 0 ? 180 : normalized;
     }

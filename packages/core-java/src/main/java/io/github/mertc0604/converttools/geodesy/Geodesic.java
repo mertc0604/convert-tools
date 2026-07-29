@@ -9,7 +9,13 @@ public final class Geodesic {
     private static final double RADIAN = 180 / Math.PI;
     private static final double TOLERANCE = 1e-13;
     private static final int MAX_ITERATIONS = 200;
-    private static final double SHOOTING_TOLERANCE = 2e-13;
+    private static final double SHOOTING_TOLERANCE = 2e-15;
+    private static final double INVERSE_ENDPOINT_TOLERANCE = 5e-12;
+    // Truncated-series noise cannot rank cut-locus routes below 0.1 mm.
+    private static final double SHORTEST_DISTANCE_TIE_METRES = 1e-4;
+    private static final double AMBIGUOUS_BEARING_SEPARATION_RADIANS = 1e-6;
+    private static final double CUT_LOCUS_DERIVATIVE_STEP_RADIANS = 1e-5;
+    private static final double CUT_LOCUS_SENSITIVITY_METRES = 1;
     private static final double MAX_DISTANCE_FACTOR = Math.PI * 1.01;
     private static final double DEFAULT_PATH_SEGMENT_METRES = 25_000;
     private static final int DEFAULT_PATH_MAX_POINTS = 2_049;
@@ -45,19 +51,32 @@ public final class Geodesic {
             );
         }
 
-        RawInverse vincenty = inverseVincenty(start, end, ellipsoid);
+        RawInverse vincentyCandidate = inverseVincenty(
+                start,
+                end,
+                ellipsoid
+        );
+        RawInverse vincenty = validatedVincentyInverse(
+                start,
+                end,
+                vincentyCandidate,
+                ellipsoid
+        );
         boolean fallback = vincenty == null;
         RawInverse result = fallback
                 ? inverseByShooting(start, end, ellipsoid)
                 : vincenty;
         boolean antipodal = exactAntipodes(start, end);
+        boolean ambiguous = antipodal
+                || result.ambiguous()
+                || cutLocusAmbiguous(start, end, result, ellipsoid);
 
         return new GeodesicResult(
                 result.distanceMetres(),
                 antipodal ? 0.0 : result.initialBearingDegrees(),
                 antipodal ? 180.0 : result.finalBearingDegrees(),
                 true,
-                antipodal,
+                ambiguous,
                 ellipsoid.id(),
                 "ellipsoidal",
                 fallback
@@ -335,7 +354,7 @@ public final class Geodesic {
                             )
                     )
             );
-            if (Math.abs(nextLambda - lambda) <= TOLERANCE) {
+            if (convergedRadians(lambda, nextLambda, TOLERANCE)) {
                 lambda = nextLambda;
                 break;
             }
@@ -404,6 +423,7 @@ public final class Geodesic {
                 b * coefficientA * (sigma - deltaSigma),
                 normalizeBearing(initialBearing * RADIAN),
                 normalizeBearing(finalBearing * RADIAN),
+                false,
                 iterations + 1
         );
     }
@@ -484,7 +504,7 @@ public final class Geodesic {
             );
             double previous = sigma;
             sigma = distanceMetres / (b * coefficientA) + deltaSigma;
-            if (Math.abs(sigma - previous) <= TOLERANCE) {
+            if (convergedRadians(previous, sigma, TOLERANCE)) {
                 break;
             }
         }
@@ -560,6 +580,11 @@ public final class Geodesic {
             for (int degree = -180; degree < 180; degree += 15) {
                 bearings.add(degree * DEGREE);
             }
+            for (double offsetDegrees : List.of(0.01, 0.1, 1.0)) {
+                double offset = offsetDegrees * DEGREE;
+                bearings.add(seed.bearing() - offset);
+                bearings.add(seed.bearing() + offset);
+            }
         } else {
             bearings.add(seed.bearing() - Math.PI / 3);
             bearings.add(seed.bearing() + Math.PI / 3);
@@ -591,6 +616,7 @@ public final class Geodesic {
             );
         }
 
+        List<ShootingResult> candidates = new ArrayList<>();
         ShootingResult best = null;
         for (double bearing : bearings) {
             for (double distance : distances) {
@@ -604,14 +630,21 @@ public final class Geodesic {
                 );
                 if (
                         candidate != null
-                                && candidate.residual() <= 5e-12
-                                && (
-                                best == null
-                                        || candidate.distanceMetres()
-                                        < best.distanceMetres()
-                        )
+                                && candidate.residual()
+                                <= INVERSE_ENDPOINT_TOLERANCE
                 ) {
-                    best = candidate;
+                    candidates.add(candidate);
+                    if (
+                            best == null
+                                    || preferShootingCandidate(
+                                    candidate,
+                                    best,
+                                    start,
+                                    end
+                            )
+                    ) {
+                        best = candidate;
+                    }
                 }
             }
         }
@@ -621,14 +654,162 @@ public final class Geodesic {
             );
         }
 
+        ShootingResult canonicalVertex = canonicalVertexCandidate(
+                start,
+                end,
+                ellipsoid,
+                best
+        );
+        if (canonicalVertex != null) {
+            candidates.add(canonicalVertex);
+            best = canonicalVertex;
+        }
+
+        ShootingResult selected = best;
+        boolean ambiguous = nearAntipodal
+                && candidates.stream().anyMatch(
+                candidate -> Math.abs(
+                        candidate.distanceMetres()
+                                - selected.distanceMetres()
+                ) <= SHORTEST_DISTANCE_TIE_METRES
+                        && Math.abs(
+                        normalizeRadians(
+                                candidate.bearing()
+                                        - selected.bearing()
+                        )
+                ) > AMBIGUOUS_BEARING_SEPARATION_RADIANS
+        );
+
         return new RawInverse(
                 best.distanceMetres(),
                 normalizeBearing(best.bearing() * RADIAN),
                 normalizeBearing(
                         best.endpoint().finalBearingRadians() * RADIAN
                 ),
+                ambiguous,
                 best.iterations()
         );
+    }
+
+    private static ShootingResult canonicalVertexCandidate(
+            GeoPoint start,
+            GeoPoint end,
+            Ellipsoid ellipsoid,
+            ShootingResult current
+    ) {
+        if (end.latitude() != -start.latitude()) {
+            return null;
+        }
+
+        double longitudeDifference = GeoPoint.normalizeLongitude(
+                end.longitude() - start.longitude()
+        );
+        double bearing = (longitudeDifference < 0 ? 270 : 90) * DEGREE;
+        RawDirect endpoint = directRaw(
+                start,
+                bearing,
+                current.distanceMetres(),
+                ellipsoid
+        );
+        double residual = endpointResidual(
+                endpoint,
+                end.latitude() * DEGREE,
+                end.longitude() * DEGREE
+        ).norm();
+        if (residual > INVERSE_ENDPOINT_TOLERANCE) {
+            return null;
+        }
+
+        return new ShootingResult(
+                endpoint,
+                bearing,
+                current.distanceMetres(),
+                residual,
+                current.iterations()
+        );
+    }
+
+    private static boolean preferShootingCandidate(
+            ShootingResult candidate,
+            ShootingResult current,
+            GeoPoint start,
+            GeoPoint end
+    ) {
+        double distanceDifference = candidate.distanceMetres()
+                - current.distanceMetres();
+        if (
+                Math.abs(distanceDifference)
+                        > SHORTEST_DISTANCE_TIE_METRES
+        ) {
+            return distanceDifference < 0;
+        }
+
+        double latitudeBalance = start.latitude() + end.latitude();
+        double preferredLatitude = latitudeBalance == 0
+                ? start.latitude()
+                : latitudeBalance;
+        if (preferredLatitude != 0) {
+            double preferredNorthingSign = Math.signum(preferredLatitude);
+            boolean candidateMatches = Math.signum(
+                    Math.cos(candidate.bearing())
+            ) == preferredNorthingSign;
+            boolean currentMatches = Math.signum(
+                    Math.cos(current.bearing())
+            ) == preferredNorthingSign;
+            if (candidateMatches != currentMatches) {
+                return candidateMatches;
+            }
+        } else {
+            double candidateCardinalOffset = Math.abs(
+                    Math.cos(candidate.bearing())
+            );
+            double currentCardinalOffset = Math.abs(
+                    Math.cos(current.bearing())
+            );
+            if (candidateCardinalOffset != currentCardinalOffset) {
+                return candidateCardinalOffset < currentCardinalOffset;
+            }
+        }
+
+        if (distanceDifference != 0) {
+            return distanceDifference < 0;
+        }
+        return candidate.residual() < current.residual();
+    }
+
+    private static boolean cutLocusAmbiguous(
+            GeoPoint start,
+            GeoPoint end,
+            RawInverse result,
+            Ellipsoid ellipsoid
+    ) {
+        SphericalSeed seed = sphericalSeed(start, end, ellipsoid);
+        if (Math.PI - seed.centralAngle() >= 0.15) {
+            return false;
+        }
+
+        double bearing = result.initialBearingDegrees() * DEGREE;
+        RawDirect plus = directRaw(
+                start,
+                bearing + CUT_LOCUS_DERIVATIVE_STEP_RADIANS,
+                result.distanceMetres(),
+                ellipsoid
+        );
+        RawDirect minus = directRaw(
+                start,
+                bearing - CUT_LOCUS_DERIVATIVE_STEP_RADIANS,
+                result.distanceMetres(),
+                ellipsoid
+        );
+        double endpointSeparation = endpointResidual(
+                plus,
+                minus.latitudeRadians(),
+                minus.longitudeRadians()
+        ).norm();
+        double bearingSensitivityMetres = endpointSeparation
+                * ellipsoid.semiMajorAxisMetres()
+                / (2 * CUT_LOCUS_DERIVATIVE_STEP_RADIANS);
+        return bearingSensitivityMetres <= CUT_LOCUS_SENSITIVITY_METRES;
     }
 
     private static ShootingResult solveShootingSeed(
@@ -807,6 +988,68 @@ public final class Geodesic {
         );
     }
 
+    private static boolean inverseEndpointMatches(
+            GeoPoint start,
+            GeoPoint end,
+            RawInverse result,
+            Ellipsoid ellipsoid
+    ) {
+        RawDirect endpoint = directRaw(
+                start,
+                result.initialBearingDegrees() * DEGREE,
+                result.distanceMetres(),
+                ellipsoid
+        );
+        Residual residual = endpointResidual(
+                endpoint,
+                end.latitude() * DEGREE,
+                end.longitude() * DEGREE
+        );
+        return residual.norm() <= INVERSE_ENDPOINT_TOLERANCE;
+    }
+
+    private static RawInverse validatedVincentyInverse(
+            GeoPoint start,
+            GeoPoint end,
+            RawInverse candidate,
+            Ellipsoid ellipsoid
+    ) {
+        if (candidate == null) {
+            return null;
+        }
+        if (inverseEndpointMatches(start, end, candidate, ellipsoid)) {
+            return candidate;
+        }
+
+        // Vincenty's fixed point can select the conjugate 90/270 branch.
+        // The alternate is accepted only after direct endpoint closure.
+        double oppositeInitialBearing = normalizeBearing(
+                candidate.initialBearingDegrees() + 180
+        );
+        RawDirect endpoint = directRaw(
+                start,
+                oppositeInitialBearing * DEGREE,
+                candidate.distanceMetres(),
+                ellipsoid
+        );
+        Residual residual = endpointResidual(
+                endpoint,
+                end.latitude() * DEGREE,
+                end.longitude() * DEGREE
+        );
+        if (residual.norm() > INVERSE_ENDPOINT_TOLERANCE) {
+            return null;
+        }
+
+        return new RawInverse(
+                candidate.distanceMetres(),
+                oppositeInitialBearing,
+                normalizeBearing(endpoint.finalBearingRadians() * RADIAN),
+                candidate.ambiguous(),
+                candidate.iterations()
+        );
+    }
+
     private static SphericalSeed sphericalSeed(
             GeoPoint start,
             GeoPoint end,
@@ -880,9 +1123,25 @@ public final class Geodesic {
     }
 
     private static double normalizeRadians(double radians) {
+        if (radians >= -Math.PI && radians <= Math.PI) {
+            return radians;
+        }
+
         return ((radians + Math.PI) % (2 * Math.PI) + 2 * Math.PI)
                 % (2 * Math.PI)
                 - Math.PI;
+    }
+
+    private static boolean convergedRadians(
+            double previous,
+            double next,
+            double tolerance
+    ) {
+        double scale = Math.min(
+                1,
+                Math.max(Math.abs(next), tolerance)
+        );
+        return Math.abs(next - previous) <= tolerance * scale;
     }
 
     private static double clamp(double value, double minimum, double maximum) {
@@ -893,6 +1152,7 @@ public final class Geodesic {
             double distanceMetres,
             double initialBearingDegrees,
             double finalBearingDegrees,
+            boolean ambiguous,
             int iterations
     ) {
     }

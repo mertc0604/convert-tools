@@ -34,6 +34,9 @@ public final class ContractTest {
         testAllLengthRoundTrips();
         testLengthContractLimits();
         testGeodesics(vectors.resolve("geodesic-wgs84.csv"));
+        testSubMillimetreGeodesic();
+        testCutLocusAmbiguity();
+        testVincentyCutLocusSensitivity();
         testPolarGeodesicSemantics();
         testPolyline();
         testGeodesicPath();
@@ -268,6 +271,85 @@ public final class ContractTest {
                 );
             }
         }
+    }
+
+    private static void testSubMillimetreGeodesic() {
+        GeoPoint start = new GeoPoint(0, 0);
+        GeoPoint end = new GeoPoint(0, 1e-9);
+        GeodesicResult inverse = Geodesic.inverse(start, end);
+        double expected = 6_378_137 * 1e-9 * Math.PI / 180;
+        require(
+                Math.abs(inverse.distanceMetres() - expected) <= 1e-15,
+                "Sub-millimetre inverse precision mismatch."
+        );
+
+        DirectResult destination = Geodesic.direct(
+                start,
+                inverse.initialBearingDegrees(),
+                inverse.distanceMetres()
+        );
+        require(
+                Math.abs(destination.destination().latitude()) <= 1e-18,
+                "Sub-millimetre direct latitude mismatch."
+        );
+        require(
+                Math.abs(
+                        destination.destination().longitude()
+                                - end.longitude()
+                ) <= 1e-18,
+                "Sub-millimetre direct longitude mismatch."
+        );
+    }
+
+    private static void testCutLocusAmbiguity() {
+        GeoPoint start = new GeoPoint(43.139205363724, 0);
+        GeoPoint end = new GeoPoint(
+                -43.13920536372438,
+                179.55910699284908
+        );
+        GeodesicResult inverse = Geodesic.inverse(start, end);
+        DirectResult destination = Geodesic.direct(
+                start,
+                inverse.initialBearingDegrees(),
+                inverse.distanceMetres()
+        );
+
+        require(
+                inverse.ambiguous(),
+                "Near-antipodal route ambiguity must be explicit."
+        );
+        require(
+                Math.abs(
+                        destination.destination().latitude()
+                                - end.latitude()
+                ) <= 1e-12,
+                "Ambiguous route latitude closure mismatch."
+        );
+        require(
+                angularDifference(
+                        destination.destination().longitude(),
+                        end.longitude()
+                ) <= 1e-12,
+                "Ambiguous route longitude closure mismatch."
+        );
+    }
+
+    private static void testVincentyCutLocusSensitivity() {
+        GeodesicResult result = Geodesic.inverse(
+                new GeoPoint(86.890600409059, 0),
+                new GeoPoint(
+                        -86.89060040905908,
+                        179.9671819225338
+                )
+        );
+        require(
+                result.solver().equals("vincenty-inverse"),
+                "Cut-locus regression must exercise Vincenty inverse."
+        );
+        require(
+                result.ambiguous(),
+                "Low bearing sensitivity must be marked ambiguous."
+        );
     }
 
     private static void testPolyline() {

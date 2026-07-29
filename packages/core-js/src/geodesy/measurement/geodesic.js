@@ -7,7 +7,13 @@ import {
 
 const DEFAULT_TOLERANCE = 1e-13;
 const DEFAULT_MAX_ITERATIONS = 200;
-const SHOOTING_TOLERANCE = 2e-13;
+const SHOOTING_TOLERANCE = 2e-15;
+const INVERSE_ENDPOINT_TOLERANCE = 5e-12;
+// Below 0.1 mm, truncated-series noise cannot safely rank cut-locus routes.
+const SHORTEST_DISTANCE_TIE_METRES = 1e-4;
+const AMBIGUOUS_BEARING_SEPARATION_RADIANS = 1e-6;
+const CUT_LOCUS_DERIVATIVE_STEP_RADIANS = 1e-5;
+const CUT_LOCUS_SENSITIVITY_METRES = 1;
 const MAX_SHORTEST_DISTANCE_FACTOR = Math.PI * 1.01;
 
 function normalizeBearing(degrees) {
@@ -15,9 +21,21 @@ function normalizeBearing(degrees) {
 }
 
 function normalizeRadians(radians) {
+  if (radians >= -Math.PI && radians <= Math.PI) {
+    return radians;
+  }
+
   return ((radians + Math.PI) % (2 * Math.PI) + 2 * Math.PI) %
     (2 * Math.PI) -
     Math.PI;
+}
+
+function convergedRadians(previous, next, tolerance) {
+  const scale = Math.min(
+    1,
+    Math.max(Math.abs(next), tolerance),
+  );
+  return Math.abs(next - previous) <= tolerance * scale;
 }
 
 function readPoint(value, name) {
@@ -142,7 +160,7 @@ function inverseVincenty(start, end, ellipsoid, tolerance, maxIterations) {
                 cosSigma *
                 (-1 + 2 * cosDoubleSigmaMiddle ** 2)));
 
-    if (Math.abs(nextLambda - lambda) <= tolerance) {
+    if (convergedRadians(lambda, nextLambda, tolerance)) {
       lambda = nextLambda;
       break;
     }
@@ -191,6 +209,7 @@ function inverseVincenty(start, end, ellipsoid, tolerance, maxIterations) {
     distanceMetres: b * coefficientA * (sigma - deltaSigma),
     initialBearingDegrees: normalizeBearing(initialBearing * RADIAN),
     finalBearingDegrees: normalizeBearing(finalBearing * RADIAN),
+    ambiguous: false,
     iterations: iterations + 1,
   };
 }
@@ -251,7 +270,7 @@ function directVincentyRaw(
               (-3 + 4 * cosDoubleSigmaMiddle ** 2)));
     previous = sigma;
     sigma = distanceMetres / (b * coefficientA) + deltaSigma;
-    if (Math.abs(sigma - previous) <= tolerance) {
+    if (convergedRadians(previous, sigma, tolerance)) {
       break;
     }
   }
@@ -322,6 +341,58 @@ function endpointResidual(endpoint, targetLatitude, targetLongitude) {
 
 function residualNorm(residual) {
   return Math.hypot(residual[0], residual[1]);
+}
+
+function inverseEndpointMatches(start, end, result, ellipsoid) {
+  const endpoint = directVincentyRaw(
+    start,
+    result.initialBearingDegrees * DEGREE,
+    result.distanceMetres,
+    ellipsoid,
+  );
+  const residual = endpointResidual(
+    endpoint,
+    end.latitude * DEGREE,
+    end.longitude * DEGREE,
+  );
+  return residualNorm(residual) <= INVERSE_ENDPOINT_TOLERANCE;
+}
+
+function validatedVincentyInverse(start, end, candidate, ellipsoid) {
+  if (!candidate) {
+    return null;
+  }
+  if (inverseEndpointMatches(start, end, candidate, ellipsoid)) {
+    return candidate;
+  }
+
+  // Vincenty's fixed point can converge on the conjugate 90°/270° branch.
+  // Accept that branch only after a direct endpoint closure check.
+  const oppositeInitialBearing = normalizeBearing(
+    candidate.initialBearingDegrees + 180,
+  );
+  const endpoint = directVincentyRaw(
+    start,
+    oppositeInitialBearing * DEGREE,
+    candidate.distanceMetres,
+    ellipsoid,
+  );
+  const residual = endpointResidual(
+    endpoint,
+    end.latitude * DEGREE,
+    end.longitude * DEGREE,
+  );
+  if (residualNorm(residual) > INVERSE_ENDPOINT_TOLERANCE) {
+    return null;
+  }
+
+  return {
+    ...candidate,
+    initialBearingDegrees: oppositeInitialBearing,
+    finalBearingDegrees: normalizeBearing(
+      endpoint.finalBearingRadians * RADIAN,
+    ),
+  };
 }
 
 function sphericalSeed(start, end, ellipsoid) {
@@ -510,6 +581,10 @@ function inverseByShooting(start, end, ellipsoid) {
     for (let degree = -180; degree < 180; degree += 15) {
       bearings.push(degree * DEGREE);
     }
+    for (const offsetDegrees of [0.01, 0.1, 1]) {
+      const offset = offsetDegrees * DEGREE;
+      bearings.push(seed.bearing - offset, seed.bearing + offset);
+    }
   } else {
     bearings.push(
       seed.bearing - Math.PI / 3,
@@ -528,6 +603,7 @@ function inverseByShooting(start, end, ellipsoid) {
     );
   }
 
+  const candidates = [];
   let best = null;
   for (const bearing of bearings) {
     for (const distance of distanceSeeds) {
@@ -541,10 +617,15 @@ function inverseByShooting(start, end, ellipsoid) {
       );
       if (
         candidate &&
-        candidate.residual <= 5e-12 &&
-        (!best || candidate.distanceMetres < best.distanceMetres)
+        candidate.residual <= INVERSE_ENDPOINT_TOLERANCE
       ) {
-        best = candidate;
+        candidates.push(candidate);
+        if (
+          !best ||
+          preferShootingCandidate(candidate, best, start, end)
+        ) {
+          best = candidate;
+        }
       }
     }
   }
@@ -553,14 +634,138 @@ function inverseByShooting(start, end, ellipsoid) {
     throw new Error("Ellipsoidal inverse calculation did not converge.");
   }
 
+  const canonicalVertex = canonicalVertexCandidate(
+    start,
+    end,
+    ellipsoid,
+    best,
+  );
+  if (canonicalVertex) {
+    candidates.push(canonicalVertex);
+    best = canonicalVertex;
+  }
+
   return {
     distanceMetres: best.distanceMetres,
     initialBearingDegrees: normalizeBearing(best.bearing * RADIAN),
     finalBearingDegrees: normalizeBearing(
       best.endpoint.finalBearingRadians * RADIAN,
     ),
+    ambiguous:
+      nearAntipodal &&
+      candidates.some(
+        (candidate) =>
+          Math.abs(candidate.distanceMetres - best.distanceMetres) <=
+            SHORTEST_DISTANCE_TIE_METRES &&
+          Math.abs(normalizeRadians(candidate.bearing - best.bearing)) >
+            AMBIGUOUS_BEARING_SEPARATION_RADIANS,
+      ),
     iterations: best.iterations,
   };
+}
+
+function canonicalVertexCandidate(start, end, ellipsoid, current) {
+  if (end.latitude !== -start.latitude) {
+    return null;
+  }
+
+  const longitudeDifference = normalizeLongitude(
+    end.longitude - start.longitude,
+  );
+  const bearing = (longitudeDifference < 0 ? 270 : 90) * DEGREE;
+  const endpoint = directVincentyRaw(
+    start,
+    bearing,
+    current.distanceMetres,
+    ellipsoid,
+  );
+  const residual = residualNorm(
+    endpointResidual(
+      endpoint,
+      end.latitude * DEGREE,
+      end.longitude * DEGREE,
+    ),
+  );
+  if (residual > INVERSE_ENDPOINT_TOLERANCE) {
+    return null;
+  }
+
+  return {
+    endpoint,
+    bearing,
+    distanceMetres: current.distanceMetres,
+    residual,
+    iterations: current.iterations,
+  };
+}
+
+function preferShootingCandidate(candidate, current, start, end) {
+  const distanceDifference =
+    candidate.distanceMetres - current.distanceMetres;
+  if (
+    Math.abs(distanceDifference) > SHORTEST_DISTANCE_TIE_METRES
+  ) {
+    return distanceDifference < 0;
+  }
+
+  const latitudeBalance = start.latitude + end.latitude;
+  const preferredLatitude =
+    latitudeBalance === 0 ? start.latitude : latitudeBalance;
+  if (preferredLatitude !== 0) {
+    const preferredNorthingSign = Math.sign(preferredLatitude);
+    const candidateMatches =
+      Math.sign(Math.cos(candidate.bearing)) === preferredNorthingSign;
+    const currentMatches =
+      Math.sign(Math.cos(current.bearing)) === preferredNorthingSign;
+    if (candidateMatches !== currentMatches) {
+      return candidateMatches;
+    }
+  } else {
+    const candidateCardinalOffset = Math.abs(
+      Math.cos(candidate.bearing),
+    );
+    const currentCardinalOffset = Math.abs(Math.cos(current.bearing));
+    if (candidateCardinalOffset !== currentCardinalOffset) {
+      return candidateCardinalOffset < currentCardinalOffset;
+    }
+  }
+
+  if (distanceDifference !== 0) {
+    return distanceDifference < 0;
+  }
+  return candidate.residual < current.residual;
+}
+
+function cutLocusAmbiguous(start, end, result, ellipsoid) {
+  const seed = sphericalSeed(start, end, ellipsoid);
+  if (Math.PI - seed.centralAngle >= 0.15) {
+    return false;
+  }
+
+  const bearing = result.initialBearingDegrees * DEGREE;
+  const plus = directVincentyRaw(
+    start,
+    bearing + CUT_LOCUS_DERIVATIVE_STEP_RADIANS,
+    result.distanceMetres,
+    ellipsoid,
+  );
+  const minus = directVincentyRaw(
+    start,
+    bearing - CUT_LOCUS_DERIVATIVE_STEP_RADIANS,
+    result.distanceMetres,
+    ellipsoid,
+  );
+  const endpointSeparation = residualNorm(
+    endpointResidual(
+      plus,
+      minus.latitudeRadians,
+      minus.longitudeRadians,
+    ),
+  );
+  const bearingSensitivityMetres =
+    (endpointSeparation * ellipsoid.a) /
+    (2 * CUT_LOCUS_DERIVATIVE_STEP_RADIANS);
+  return bearingSensitivityMetres <= CUT_LOCUS_SENSITIVITY_METRES;
 }
 
 export function inverseGeodesic(startValue, endValue, options = {}) {
@@ -593,16 +798,26 @@ export function inverseGeodesic(startValue, endValue, options = {}) {
     });
   }
 
-  const vincenty = inverseVincenty(
+  const vincentyCandidate = inverseVincenty(
     start,
     end,
     ellipsoid,
     tolerance,
     maxIterations,
   );
+  const vincenty = validatedVincentyInverse(
+    start,
+    end,
+    vincentyCandidate,
+    ellipsoid,
+  );
   const antipodal = exactAntipodes(start, end);
   const result = vincenty ?? inverseByShooting(start, end, ellipsoid);
   const fallbackUsed = vincenty === null;
+  const ambiguous =
+    antipodal ||
+    result.ambiguous === true ||
+    cutLocusAmbiguous(start, end, result, ellipsoid);
   const initialBearingDegrees = antipodal
     ? 0
     : result.initialBearingDegrees;
@@ -615,7 +830,7 @@ export function inverseGeodesic(startValue, endValue, options = {}) {
     initialBearingDegrees,
     finalBearingDegrees,
     azimuthDefined: true,
-    ambiguous: antipodal,
+    ambiguous,
     ellipsoid: ellipsoid.id,
     algorithm: "ellipsoidal",
     solver: fallbackUsed ? "vincenty-direct-shooting" : "vincenty-inverse",

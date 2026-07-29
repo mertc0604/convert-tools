@@ -32,6 +32,10 @@ export function pointFromValues(latitude, longitude) {
 }
 
 export function normalizeLongitude(longitude) {
+  if (longitude >= -180 && longitude <= 180) {
+    return longitude;
+  }
+
   const normalized = ((longitude + 180) % 360 + 360) % 360 - 180;
   return normalized === -180 && longitude > 0 ? 180 : normalized;
 }

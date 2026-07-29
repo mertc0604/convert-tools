@@ -83,6 +83,7 @@ export interface GeodesicResult {
   readonly initialBearingDegrees: number | null;
   readonly finalBearingDegrees: number | null;
   readonly azimuthDefined: boolean;
+  /** Multiple routes are indistinguishable within the solver accuracy. */
   readonly ambiguous: boolean;
   readonly ellipsoid: string;
   readonly algorithm: "ellipsoidal";

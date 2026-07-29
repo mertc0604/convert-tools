@@ -14,6 +14,11 @@ noktalarda birden fazla en kısa yol olduğu için azimut alanları özellikle b
 bırakılır; iki çekirdek canonical sonuç döndürse de kabul testi yalnız mesafeyi
 zorunlu tutar.
 
+Geodezik referanslar GeographicLib'in WGS 84 `GeodSolve` sonuçlarından
+alınmıştır. Aralarında kutup, antimeridyen, yakın antipodal ve 90°/270° vertex
+dalı örnekleri bulunur:
+https://geographiclib.sourceforge.io/cgi-bin/GeodSolve
+
 Koordinat projeksiyonlarında zon, yarımküre ve EPSG kimliği birebir
 eşleşmelidir. `expected_x` ve `expected_y`, satırdaki `output_tolerance`
 sınırında karşılaştırılır. Ters dönüşüm de
