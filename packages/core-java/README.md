@@ -113,6 +113,25 @@ PolylineMeasurement measurement = Geodesic.measurePolyline(List.of(
 ));
 ```
 
+Tek bir ölçüm geodeziğini bir harita katmanında çizmek için eşit mesafe
+aralıklı noktalar üretilebilir:
+
+```java
+GeodesicPath path = Geodesic.samplePath(
+    new GeoPoint(39.933365, 32.859742),
+    new GeoPoint(41.008238, 28.978359),
+    25_000,
+    2_049
+);
+
+System.out.println(path.distanceMetres());
+System.out.println(path.points());
+```
+
+Noktalar yalnız çizim içindir; ölçüm `Geodesic.inverse` sonucundan gelir.
+`maxPoints` güvenlik sınırı hedef segment boyunu geçersiz kılarsa etkin
+segment uzunluğu `sampledMaximumSegmentMetres()` ile bildirilir.
+
 Hesaplar iki boyutlu WGS 84 elipsoit yüzey mesafesidir. Web Mercator piksel
 mesafesi, rhumb line, grid mesafesi veya yükseklik içeren 3B eğik mesafe
 değildir.

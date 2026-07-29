@@ -31,6 +31,7 @@ export {
   fromUtmUps,
   inverseGeodesic,
   measureGeodesicPolyline,
+  sampleGeodesicPath,
   normalizeEpsg,
   SUPPORTED_CRS,
   transformCrs,

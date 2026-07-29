@@ -56,9 +56,10 @@ test("API yalnız uzunluk birimleri ve geodezik işlemleri bildirir", async () =
   assert.ok(body.types.includes("geodesic"));
   assert.deepEqual(
     body.geodesic.operations,
-    ["inverse", "direct", "polyline"],
+    ["inverse", "direct", "polyline", "path"],
   );
   assert.equal(body.geodesic.maximumApiPolylinePoints, 1000);
+  assert.equal(body.geodesic.maximumApiPathPoints, 2049);
   assert.equal(body.limits.maximumRequestBodyBytes, 128 * 1024);
   assert.equal(body.limits.maximumExactInputDigits, 4096);
 });
@@ -250,6 +251,39 @@ test("API geodesic polyline toplamını hesaplar", async () => {
   const body = await response.json();
   assert.equal(body.result.segmentCount, 2);
   assert.ok(Math.abs(body.result.distanceMetres - 221893.87935107236) < 0.001);
+});
+
+test("API hesaplanan geodezik hattı sınırlı çizim noktalarıyla döndürür", async () => {
+  const response = await request({
+    type: "geodesic",
+    operation: "path",
+    start: { latitude: 0, longitude: 0 },
+    end: { latitude: 60, longitude: 1 },
+    maxSegmentMetres: 500_000,
+    maxPoints: 20,
+  });
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.deepEqual(body.result.points[0], { latitude: 0, longitude: 0 });
+  assert.deepEqual(body.result.points.at(-1), {
+    latitude: 60,
+    longitude: 1,
+  });
+  assert.equal(body.result.points.length, body.result.segmentCount + 1);
+  assert.ok(body.result.points.length <= 20);
+  assert.equal(body.result.distance.distanceMetres, body.result.distanceMetres);
+});
+
+test("API geodezik hat çıktı sınırını uygular", async () => {
+  const response = await request({
+    type: "geodesic",
+    operation: "path",
+    start: { latitude: 0, longitude: 0 },
+    end: { latitude: 1, longitude: 1 },
+    maxPoints: 2050,
+  });
+  assert.equal(response.status, 400);
+  assert.match((await response.json()).error, /maxPoints/);
 });
 
 test("API aşırı büyük polyline isteğini reddeder", async () => {

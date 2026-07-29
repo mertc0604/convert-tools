@@ -11,6 +11,9 @@ public final class Geodesic {
     private static final int MAX_ITERATIONS = 200;
     private static final double SHOOTING_TOLERANCE = 2e-13;
     private static final double MAX_DISTANCE_FACTOR = Math.PI * 1.01;
+    private static final double DEFAULT_PATH_SEGMENT_METRES = 25_000;
+    private static final int DEFAULT_PATH_MAX_POINTS = 2_049;
+    private static final int PATH_MAX_POINTS_LIMIT = 10_001;
 
     private Geodesic() {
     }
@@ -170,6 +173,94 @@ public final class Geodesic {
                 ellipsoid.id(),
                 "ellipsoidal-segments",
                 segments
+        );
+    }
+
+    public static GeodesicPath samplePath(GeoPoint start, GeoPoint end) {
+        return samplePath(
+                start,
+                end,
+                DEFAULT_PATH_SEGMENT_METRES,
+                DEFAULT_PATH_MAX_POINTS,
+                Ellipsoid.WGS84
+        );
+    }
+
+    public static GeodesicPath samplePath(
+            GeoPoint start,
+            GeoPoint end,
+            double maxSegmentMetres,
+            int maxPoints
+    ) {
+        return samplePath(
+                start,
+                end,
+                maxSegmentMetres,
+                maxPoints,
+                Ellipsoid.WGS84
+        );
+    }
+
+    public static GeodesicPath samplePath(
+            GeoPoint start,
+            GeoPoint end,
+            double maxSegmentMetres,
+            int maxPoints,
+            Ellipsoid ellipsoid
+    ) {
+        Objects.requireNonNull(start, "start");
+        Objects.requireNonNull(end, "end");
+        Objects.requireNonNull(ellipsoid, "ellipsoid");
+        if (!Double.isFinite(maxSegmentMetres) || maxSegmentMetres <= 0) {
+            throw new IllegalArgumentException(
+                    "maxSegmentMetres must be finite and greater than zero."
+            );
+        }
+        if (maxPoints < 2 || maxPoints > PATH_MAX_POINTS_LIMIT) {
+            throw new IllegalArgumentException(
+                    "maxPoints must be between 2 and "
+                            + PATH_MAX_POINTS_LIMIT
+                            + "."
+            );
+        }
+
+        GeodesicResult measurement = inverse(start, end, ellipsoid);
+        if (measurement.distanceMetres() == 0) {
+            return GeodesicPath.from(
+                    measurement,
+                    List.of(start),
+                    0,
+                    0
+            );
+        }
+
+        long requestedSegments = Math.max(
+                1,
+                (long) Math.ceil(
+                        measurement.distanceMetres() / maxSegmentMetres
+                )
+        );
+        int segmentCount = (int) Math.min(
+                requestedSegments,
+                (long) maxPoints - 1
+        );
+        List<GeoPoint> points = new ArrayList<>(segmentCount + 1);
+        points.add(start);
+        for (int index = 1; index < segmentCount; index++) {
+            points.add(direct(
+                    start,
+                    measurement.initialBearingDegrees(),
+                    measurement.distanceMetres() * index / segmentCount,
+                    ellipsoid
+            ).destination());
+        }
+        points.add(end);
+
+        return GeodesicPath.from(
+                measurement,
+                points,
+                segmentCount,
+                measurement.distanceMetres() / segmentCount
         );
     }
 
@@ -759,22 +850,29 @@ public final class Geodesic {
 
     private static boolean coincident(GeoPoint start, GeoPoint end) {
         return start.latitude() == end.latitude()
-                && Math.abs(
-                GeoPoint.normalizeLongitude(
-                        start.longitude() - end.longitude()
-                )
-        ) == 0;
+                && (Math.abs(start.latitude()) == 90
+                        || Math.abs(
+                                GeoPoint.normalizeLongitude(
+                                        start.longitude() - end.longitude()
+                                )
+                        ) == 0
+                );
     }
 
     private static boolean exactAntipodes(GeoPoint start, GeoPoint end) {
-        return Math.abs(start.latitude() + end.latitude()) <= 1e-13
-                && Math.abs(
-                Math.abs(
-                        GeoPoint.normalizeLongitude(
-                                end.longitude() - start.longitude()
-                        )
-                ) - 180
-        ) <= 1e-13;
+        boolean oppositePoles = Math.abs(start.latitude()) == 90
+                && end.latitude() == -start.latitude();
+        return oppositePoles
+                || (Math.abs(start.latitude() + end.latitude()) <= 1e-13
+                        && Math.abs(
+                                Math.abs(
+                                        GeoPoint.normalizeLongitude(
+                                                end.longitude()
+                                                        - start.longitude()
+                                        )
+                                ) - 180
+                        ) <= 1e-13
+                );
     }
 
     private static double normalizeBearing(double degrees) {

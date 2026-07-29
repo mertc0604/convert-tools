@@ -108,6 +108,21 @@ export interface PolylineMeasurement {
   readonly segments: readonly GeodesicResult[];
 }
 
+export interface GeodesicPathOptions extends GeodesicOptions {
+  /**
+   * Requested upper bound for a rendered segment. The `maxPoints` safety cap
+   * can make the reported sampled segment length larger than this value.
+   */
+  readonly maxSegmentMetres?: number;
+  readonly maxPoints?: number;
+}
+
+export interface GeodesicPath extends GeodesicResult {
+  readonly points: readonly NumericGeoPoint[];
+  readonly segmentCount: number;
+  readonly sampledMaximumSegmentMetres: number;
+}
+
 export const UNIT_CATEGORIES: readonly UnitCategory[];
 export const WGS84: Readonly<Ellipsoid & {
   readonly utmScale: number;
@@ -161,6 +176,11 @@ export function measureGeodesicPolyline(
   points: readonly GeoPoint[],
   options?: GeodesicOptions,
 ): PolylineMeasurement;
+export function sampleGeodesicPath(
+  start: GeoPoint,
+  end: GeoPoint,
+  options?: GeodesicPathOptions,
+): GeodesicPath;
 
 export function fromDecimalDegrees(
   latitude: string | number,

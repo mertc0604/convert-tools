@@ -26,6 +26,16 @@ test("Uzunluk ve koordinat arayüzünü sunucu tarafında oluşturur", async () 
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
+  assert.match(
+    response.headers.get("content-security-policy") ?? "",
+    /worker-src 'self' blob:/,
+  );
+  assert.match(
+    response.headers.get("content-security-policy") ?? "",
+    /object-src 'none'/,
+  );
+  assert.equal(response.headers.get("x-content-type-options"), "nosniff");
+  assert.equal(response.headers.get("x-frame-options"), "DENY");
 
   const html = await response.text();
   assert.match(

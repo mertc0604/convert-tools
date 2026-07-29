@@ -3,6 +3,7 @@ package io.github.mertc0604.converttools;
 import io.github.mertc0604.converttools.geodesy.DirectResult;
 import io.github.mertc0604.converttools.geodesy.GeoPoint;
 import io.github.mertc0604.converttools.geodesy.Geodesic;
+import io.github.mertc0604.converttools.geodesy.GeodesicPath;
 import io.github.mertc0604.converttools.geodesy.GeodesicResult;
 import io.github.mertc0604.converttools.geodesy.PolylineMeasurement;
 import io.github.mertc0604.converttools.units.LengthConverter;
@@ -33,7 +34,9 @@ public final class ContractTest {
         testAllLengthRoundTrips();
         testLengthContractLimits();
         testGeodesics(vectors.resolve("geodesic-wgs84.csv"));
+        testPolarGeodesicSemantics();
         testPolyline();
+        testGeodesicPath();
         System.out.println("Java contract tests passed.");
     }
 
@@ -278,6 +281,109 @@ public final class ContractTest {
                 Math.abs(result.distanceMetres() - 221893.87935107236)
                         <= 0.001,
                 "Polyline distance mismatch"
+        );
+    }
+
+    private static void testGeodesicPath() {
+        GeoPoint start = new GeoPoint(39.933365, 32.859742);
+        GeoPoint end = new GeoPoint(41.008238, 28.978359);
+        GeodesicPath path = Geodesic.samplePath(
+                start,
+                end,
+                50_000,
+                100
+        );
+        require(path.points().get(0).equals(start), "Path start mismatch.");
+        require(
+                path.points().get(path.points().size() - 1).equals(end),
+                "Path end mismatch."
+        );
+        require(
+                path.points().size() == path.segmentCount() + 1,
+                "Path point count mismatch."
+        );
+        require(
+                path.sampledMaximumSegmentMetres() <= 50_000,
+                "Path segment target was not respected."
+        );
+
+        for (int index = 1; index < path.points().size(); index++) {
+            double segment = Geodesic.inverse(
+                    path.points().get(index - 1),
+                    path.points().get(index)
+            ).distanceMetres();
+            require(
+                    Math.abs(
+                            segment - path.sampledMaximumSegmentMetres()
+                    ) < 0.001,
+                    "Path sampling is not equal-distance."
+            );
+        }
+
+        GeodesicPath capped = Geodesic.samplePath(
+                new GeoPoint(0, 0),
+                new GeoPoint(90, 120),
+                1_000,
+                3
+        );
+        require(capped.points().size() == 3, "Path cap mismatch.");
+        require(
+                capped.sampledMaximumSegmentMetres() > 1_000,
+                "Path cap must report the effective segment length."
+        );
+
+        GeodesicPath identity = Geodesic.samplePath(
+                new GeoPoint(90, -135),
+                new GeoPoint(90, 77)
+        );
+        require(identity.distanceMetres() == 0, "Pole identity mismatch.");
+        require(
+                identity.points().size() == 1
+                        && identity.segmentCount() == 0,
+                "Zero-length path must contain one marker."
+        );
+    }
+
+    private static void testPolarGeodesicSemantics() {
+        for (double latitude : List.of(-90.0, 90.0)) {
+            GeodesicResult result = Geodesic.inverse(
+                    new GeoPoint(latitude, -135),
+                    new GeoPoint(latitude, 77)
+            );
+            require(
+                    result.distanceMetres() == 0,
+                    "A pole must be coincident regardless of longitude."
+            );
+            require(
+                    !result.azimuthDefined()
+                            && result.initialBearingDegrees() == null
+                            && result.finalBearingDegrees() == null,
+                    "A coincident pole must not define an azimuth."
+            );
+            require(
+                    !result.ambiguous()
+                            && result.solver().equals("identity"),
+                    "A coincident pole must use identity semantics."
+            );
+        }
+
+        GeodesicResult antipodal = Geodesic.inverse(
+                new GeoPoint(90, 10),
+                new GeoPoint(-90, 80)
+        );
+        require(
+                Math.abs(
+                        antipodal.distanceMetres()
+                                - 20_003_931.458625447
+                ) <= 0.001,
+                "Opposite-pole distance mismatch."
+        );
+        require(
+                antipodal.azimuthDefined()
+                        && antipodal.ambiguous()
+                        && antipodal.initialBearingDegrees() == 0
+                        && antipodal.finalBearingDegrees() == 180,
+                "Opposite poles must expose canonical ambiguous azimuths."
         );
     }
 

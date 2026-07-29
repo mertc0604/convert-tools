@@ -12,6 +12,7 @@ uyarlaması aynı kimlikleri ve ortak referans vektörlerini kullanır.
 - Uzunluk: mm, cm, m, km, inç, ayak, yarda, kara mili ve deniz mili
 - Harita ölçümü: iki nokta arası elipsoidal mesafe, başlangıç/varış azimutu
   ve çok parçalı çizgi uzunluğu
+- İnteraktif küre: ölçülen en kısa geodeziği Cesium üzerinde çizme
 - WGS 84 formatları: DD, DMS, DDM, MGRS, UTM/UPS, GARS ve GEOREF
 - CRS: EPSG:4326, EPSG:3857, WGS 84 UTM zonları ve UPS
 - JavaScript paketi: `@convert-tools/core`
@@ -36,6 +37,7 @@ uyarlaması aynı kimlikleri ve ortak referans vektörlerini kullanır.
 ```text
 app/                          React sayfası ve HTTP route
 components/                   Yalnız arayüz bileşenleri
+  coordinates/map/            Lazy Cesium sunum adaptörü
 lib/api/                      HTTP istek/yanıt adaptörü
 
 packages/
@@ -66,6 +68,8 @@ tests/                        Core, HTTP ve render testleri
 
 React kodu hesap formülü içermez. HTTP katmanı da yalnızca public core API'yi
 çağırır. Böylece tarayıcı, sunucu ve başka projelerde aynı sonuç üretilir.
+Cesium yalnız uygulamanın görsel katmanıdır; `@convert-tools/core` ve Java
+çekirdeği Cesium'a veya başka bir harita paketine bağımlı değildir.
 
 ## JavaScript kullanımı
 
@@ -117,6 +121,29 @@ console.log(result.distanceMetres);
 console.log(result.initialBearingDegrees);
 ```
 
+### Hesaplanan hattı haritada çizme
+
+`sampleGeodesicPath`, inverse çözümün bulduğu aynı kısa geodezik üzerinde eşit
+mesafe aralıklı noktalar üretir. Dönen `distanceMetres` inverse çözümün
+sonucudur; örnek noktalar yalnız çizim içindir:
+
+```js
+import { sampleGeodesicPath } from "@convert-tools/core/geodesy";
+
+const path = sampleGeodesicPath(
+  { latitude: 39.933365, longitude: 32.859742 },
+  { latitude: 41.008238, longitude: 28.978359 },
+  { maxSegmentMetres: 25_000, maxPoints: 2_049 },
+);
+
+console.log(path.distanceMetres);
+console.log(path.points); // { latitude, longitude }[]
+```
+
+`maxPoints` kaynak tüketimini sınırlar. Bu sınır nedeniyle hedef segment
+uzunluğu aşıldığında gerçek aralık `sampledMaximumSegmentMetres` alanında
+bildirilir.
+
 ### GeoJSON / harita çizgisi uzunluğu
 
 GeoJSON koordinatları `[longitude, latitude]` sırasındadır. Core API ise isimli
@@ -145,6 +172,9 @@ GeoPoint istanbul = new GeoPoint(41.008238, 28.978359);
 
 GeodesicResult result = Geodesic.inverse(ankara, istanbul);
 System.out.println(result.distanceMetres());
+
+GeodesicPath path = Geodesic.samplePath(ankara, istanbul);
+System.out.println(path.points());
 ```
 
 Java uzunluk motoru aynı birim kimliklerini ve kesin kesir sözleşmesini
@@ -232,12 +262,32 @@ ekvator, antimeridyen, kutup ve antipodal vektörler bağımsız referanslara g�
 `1 mm` toleransla doğrulanır. Çok parçalı toplamda Neumaier telafili toplama
 kullanılır.
 
+Bir boylam derecesinin fiziksel uzunluğu enleme bağlıdır: ekvatorda en büyük,
+kutuplara yaklaştıkça sıfıra yakın olur. Aynı kutup noktasında farklı yazılmış
+boylamlar bu nedenle tek fiziksel nokta kabul edilir. Enlem doğrultusundaki
+meridyen yayları da WGS 84 basıklığı nedeniyle küresel bir modelle aynı
+değildir.
+
+Google Maps JavaScript geometri yardımcıları varsayılan olarak yarıçapı
+`6.378.137 m` olan küresel bir model kullanır. Bu çekirdek ise WGS 84 elipsoidi
+kullanır. Örneğin `(0°, 0°) → (90°, 0°)` için elipsoidal yüzey mesafesi
+yaklaşık `10.001.965,729 m`, küresel çeyrek çevre ise yaklaşık
+`10.018.754,171 m` olur. Yaklaşık `16,788 km` fark bir yuvarlama hatası değil,
+iki farklı jeodezik modelin sonucudur. Google modelinin ayrıntısı
+[`geometry.spherical` referansında](https://developers.google.com/maps/documentation/javascript/reference/geometry)
+belgelenir.
+
 Bu değer elipsoit yüzey mesafesidir. Şunlarla aynı değildir:
 
 - EPSG:3857 üzerinde düz çizgi mesafesi
 - UTM grid mesafesi
 - rhumb line / sabit kerteriz yolu
 - rakım içeren 3B eğik mesafe
+
+Uygulamadaki Cesium görünümü, çekirdeğin örneklediği hattı yerel Natural Earth
+altlığı üzerinde gösterir. Cesium ölçüm yapmaz; sonuçları değiştirmez. Araziye
+oturtma ve yükseklik hesabı özellikle kapalıdır, dolayısıyla çizgi WGS 84
+elipsoit yüzey ölçümünü temsil eder.
 
 Sayısal doğruluk, kaynak koordinatın veya sensörün gerçek dünya doğruluğunu
 artırmaz. Operasyonel kullanımda datum, yükseklik modeli, cihaz hatası ve

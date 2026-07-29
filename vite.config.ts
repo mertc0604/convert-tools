@@ -1,10 +1,19 @@
 import vinext from "vinext";
 import { defineConfig } from "vite";
+import { viteStaticCopy } from "vite-plugin-static-copy";
 
 const localBindingConfig = {
   main: "./worker/index.ts",
   compatibility_flags: ["nodejs_compat"],
 };
+const cesiumSource = "node_modules/cesium/Build/Cesium";
+const cesiumSourceSegmentCount = cesiumSource.split("/").length;
+const cesiumRuntimeDirectories = [
+  "Assets",
+  "ThirdParty",
+  "Widgets",
+  "Workers",
+];
 
 export default defineConfig(async () => {
   // Keep Wrangler and Miniflare state project-local. These are non-secret tool
@@ -19,6 +28,20 @@ export default defineConfig(async () => {
   return {
     plugins: [
       vinext(),
+      viteStaticCopy({
+        targets: [
+          ...cesiumRuntimeDirectories.map((directory) => ({
+            src: `${cesiumSource}/${directory}/**/*`,
+            dest: `cesium/${directory}`,
+            rename: { stripBase: cesiumSourceSegmentCount + 1 },
+          })),
+          {
+            src: `${cesiumSource}/index.js`,
+            dest: "cesium",
+            rename: { stripBase: true },
+          },
+        ],
+      }),
       cloudflare({
         viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
         config: localBindingConfig,

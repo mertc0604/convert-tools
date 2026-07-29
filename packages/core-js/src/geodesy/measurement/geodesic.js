@@ -60,15 +60,22 @@ function readEllipsoid(value) {
 function coincident(start, end) {
   return (
     start.latitude === end.latitude &&
-    Math.abs(normalizeLongitude(start.longitude - end.longitude)) === 0
+    (Math.abs(start.latitude) === 90 ||
+      Math.abs(normalizeLongitude(start.longitude - end.longitude)) === 0)
   );
 }
 
 function exactAntipodes(start, end) {
+  const oppositePoles =
+    Math.abs(start.latitude) === 90 &&
+    end.latitude === -start.latitude;
+
   return (
-    Math.abs(start.latitude + end.latitude) <= 1e-13 &&
-    Math.abs(Math.abs(normalizeLongitude(end.longitude - start.longitude)) - 180) <=
-      1e-13
+    oppositePoles ||
+    (Math.abs(start.latitude + end.latitude) <= 1e-13 &&
+      Math.abs(
+        Math.abs(normalizeLongitude(end.longitude - start.longitude)) - 180,
+      ) <= 1e-13)
   );
 }
 

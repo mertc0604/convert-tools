@@ -1,3 +1,5 @@
+@import "cesium/Build/Cesium/Widgets/widgets.css";
+
 :root {
   --background: #f5f7f6;
   --surface: #ffffff;
@@ -646,19 +648,6 @@ footer {
   margin-top: 12px;
 }
 
-.distance-point-heading {
-  margin: 0 0 9px;
-  color: var(--muted);
-  font-size: 10px;
-  font-weight: 750;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
-.distance-point-heading + .field-grid + .distance-point-heading {
-  margin-top: 16px;
-}
-
 .crs-actions {
   display: flex;
   gap: 9px;
@@ -687,7 +676,7 @@ footer {
 }
 
 .distance-results {
-  margin-top: 18px;
+  margin-top: 0;
 }
 
 .crs-result {
@@ -703,6 +692,221 @@ footer {
 .axis-note {
   margin: 14px 0 0;
   line-height: 1.55;
+}
+
+.measurement-workspace {
+  display: grid;
+  grid-template-columns: minmax(330px, 0.92fr) minmax(0, 1.35fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.measurement-controls {
+  min-width: 0;
+}
+
+.distance-form {
+  padding: 18px;
+}
+
+.distance-fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.distance-fieldset + .distance-fieldset {
+  margin-top: 16px;
+}
+
+.distance-fieldset legend {
+  width: 100%;
+  margin: 0 0 9px;
+  padding: 0;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.distance-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.distance-form-actions > span {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.distance-output {
+  margin-top: 12px;
+}
+
+.distance-warning {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border: 1px solid #dfd1b8;
+  border-radius: 9px;
+  background: #fdfaf4;
+  color: #75551f;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.calculation-details {
+  margin-top: 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.calculation-details summary {
+  padding: 10px 12px;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.calculation-details dl {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0 12px 12px;
+}
+
+.calculation-details dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  font-size: 10px;
+}
+
+.calculation-details dt {
+  color: var(--muted);
+}
+
+.calculation-details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-family: var(--mono);
+  text-align: right;
+}
+
+.geodesic-map-panel {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 15px;
+  background: var(--surface-soft);
+}
+
+.geodesic-map-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.geodesic-map-heading h2 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.geodesic-map-heading p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.map-fit-button {
+  min-height: 34px;
+  flex: 0 0 auto;
+  padding: 0 11px;
+  font-size: 10px;
+}
+
+.map-model-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 9px;
+}
+
+.map-model-badges span {
+  padding: 4px 7px;
+  border-radius: 6px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 9px;
+  font-weight: 750;
+}
+
+.geodesic-map-frame {
+  position: relative;
+  min-height: 430px;
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: 11px;
+  background: #0d1712;
+}
+
+.geodesic-map-image,
+.geodesic-map-canvas,
+.geodesic-map-canvas > .cesium-viewer,
+.geodesic-map-canvas .cesium-viewer-cesiumWidgetContainer,
+.geodesic-map-canvas .cesium-widget,
+.geodesic-map-canvas canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.geodesic-map-canvas .cesium-viewer-bottom {
+  right: 5px;
+  bottom: 3px;
+  left: 5px;
+}
+
+.geodesic-map-canvas .cesium-widget-credits {
+  font-size: 8px;
+}
+
+.map-state-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(13, 23, 18, 0.82);
+  color: white;
+  font-size: 11px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.map-state-overlay.map-error {
+  background: rgba(52, 28, 26, 0.9);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 @media (max-width: 760px) {
@@ -730,6 +934,14 @@ footer {
 
   .field-grid.four {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .measurement-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .geodesic-map-frame {
+    min-height: 350px;
   }
 }
 
@@ -782,6 +994,20 @@ footer {
 
   .conversion-meta code {
     text-align: left;
+  }
+
+  .distance-form-actions,
+  .geodesic-map-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .map-fit-button {
+    width: 100%;
+  }
+
+  .geodesic-map-frame {
+    min-height: 300px;
   }
 }
 

@@ -69,10 +69,36 @@ export const COPY = {
     kilometres: "Kilometre",
     nauticalMiles: "Deniz mili",
     bearings: "Başlangıç → varış azimutu",
+    measurementResult: "Mesafe sonucu",
+    measurementReady: "Mesafe ve harita çizgisi güncellendi.",
+    measurementCleared:
+      "Koordinatlar değişti. Önceki sonuç ve harita çizgisi temizlendi.",
     distanceInvalid:
       "Mesafe hesaplanamadı. Enlem ve boylam değerlerini kontrol edin.",
+    coordinateRange: "Enlem ±90°, boylam ±180°",
     distanceModel:
-      "WGS 84 elipsoidi üzerindeki en kısa yüzey yolu hesaplanır; Web Mercator düzlem mesafesi kullanılmaz.",
+      "WGS 84 elipsoidi üzerindeki en kısa yüzey yolu hesaplanır; yükseklik ve arazi eğimi dahil değildir.",
+    calculationDetails: "Hesaplama ayrıntıları",
+    shortestGeodesic: "en kısa elipsoidal yol",
+    solver: "Çözücü",
+    iterations: "İterasyon",
+    mapSegments: "Çizgi parçası",
+    googleSphereDifference: "küresel model; sonuç farklı olabilir",
+    ambiguousPath:
+      "Bu iki nokta için en kısa yol tek değildir. Haritada kararlı bir temsil yolu gösterilir.",
+    mapTitle: "Ölçüm haritası",
+    mapVisualOnly:
+      "Çizgi çekirdekte hesaplanır; harita yalnızca sonucu gösterir.",
+    mapFit: "Hattı göster",
+    mapModel: "Hesaplama modeli",
+    mapNoTerrain: "Arazi yüksekliği hariç",
+    mapLoading: "Harita hazırlanıyor…",
+    mapUnavailable:
+      "Harita görüntülenemedi. Mesafe hesaplama kullanılmaya devam edebilir.",
+    mapEmpty: "Haritada gösterilecek güncel ölçüm yok.",
+    mapStart: "Başlangıç A",
+    mapEnd: "Bitiş B",
+    mapDistance: "Elipsoidal mesafe",
     coordinateFooter:
       "Dönüşümler ve ölçümler çevrimdışı çalışır; sonuçlar kullanım amacına uygun kaynakla doğrulanmalıdır.",
   },
@@ -146,10 +172,36 @@ export const COPY = {
     kilometres: "Kilometres",
     nauticalMiles: "Nautical miles",
     bearings: "Initial → final bearing",
+    measurementResult: "Distance result",
+    measurementReady: "The distance and map line were updated.",
+    measurementCleared:
+      "The coordinates changed. The previous result and map line were cleared.",
     distanceInvalid:
       "The distance could not be calculated. Check the latitude and longitude values.",
+    coordinateRange: "Latitude ±90°, longitude ±180°",
     distanceModel:
-      "Uses the shortest surface path on the WGS 84 ellipsoid; Web Mercator planar distance is not used.",
+      "Uses the shortest surface path on the WGS 84 ellipsoid; elevation and terrain slope are not included.",
+    calculationDetails: "Calculation details",
+    shortestGeodesic: "shortest ellipsoidal path",
+    solver: "Solver",
+    iterations: "Iterations",
+    mapSegments: "Line segments",
+    googleSphereDifference: "spherical model; results can differ",
+    ambiguousPath:
+      "The shortest path is not unique for these points. The map shows a stable representative path.",
+    mapTitle: "Measurement map",
+    mapVisualOnly:
+      "The core calculates the line; the map only displays the result.",
+    mapFit: "Show line",
+    mapModel: "Calculation model",
+    mapNoTerrain: "Terrain elevation excluded",
+    mapLoading: "Preparing the map…",
+    mapUnavailable:
+      "The map could not be displayed. Distance calculation remains available.",
+    mapEmpty: "There is no current measurement to display on the map.",
+    mapStart: "Start A",
+    mapEnd: "End B",
+    mapDistance: "Ellipsoidal distance",
     coordinateFooter:
       "Conversions and measurements work offline; verify results against a source appropriate for the intended use.",
   },

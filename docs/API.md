@@ -10,6 +10,13 @@ Yerel adres: `http://127.0.0.1:5173/api/convert`
 - En büyük istek gövdesi: `131072` bayt
 - Bir kesin sayı bileşeninde en fazla `4096` onluk basamak
 
+API kimlik bilgisi taşımayan, durumsuz ve bilinçli olarak genel kullanıma açık
+bir hesaplama servisidir. İnternete açık operasyonel dağıtımda Cloudflare Rate
+Limiting/WAF veya eşdeğer bir API ağ geçidiyle istemci başına kota
+uygulanmalıdır. CORS `*`, farklı JavaScript projelerinden yerel hesap motoruna
+erişim için açıktır; hassas veri ve kullanıcı oturumu bu endpoint'e
+eklenmemelidir.
+
 ## Kesin uzunluk dönüşümü
 
 ```json
@@ -149,6 +156,28 @@ Her ardışık çift ayrı WGS 84 geodezik segment olarak ölçülür:
 
 HTTP API tek istekte en fazla `1000` nokta kabul eder. Daha büyük geometriler
 istemci tarafında bölünebilir veya doğrudan core kütüphanesiyle ölçülebilir.
+
+## Geodezik hattı çizim için örnekleme
+
+`path` işlemi, inverse ölçümün bulduğu aynı WGS 84 kısa geodeziği üzerinde
+eşit mesafeli çizim noktaları döndürür:
+
+```json
+{
+  "type": "geodesic",
+  "operation": "path",
+  "start": { "latitude": 39.933365, "longitude": 32.859742 },
+  "end": { "latitude": 41.008238, "longitude": 28.978359 },
+  "maxSegmentMetres": 25000,
+  "maxPoints": 2049,
+  "outputUnit": "kilometre"
+}
+```
+
+`result.distanceMetres` ölçülen mesafedir; `result.points` yalnız harita
+çizimi içindir. API en fazla `2049` çizim noktası döndürür. Güvenlik sınırı
+hedef segment uzunluğundan önce devreye girerse etkin aralık
+`result.sampledMaximumSegmentMetres` alanında bildirilir.
 
 ## Direct geodezik
 

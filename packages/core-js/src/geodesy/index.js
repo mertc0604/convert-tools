@@ -26,4 +26,5 @@ export {
   directGeodesic,
   inverseGeodesic,
   measureGeodesicPolyline,
+  sampleGeodesicPath,
 } from "./measurement/index.js";

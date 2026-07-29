@@ -60,13 +60,22 @@ export async function POST(request: Request) {
     const payload = await readJsonPayload(request);
     return json(convertRequest(payload));
   } catch (error) {
-    const status =
+    const clientError =
       error instanceof ConversionRequestError || error instanceof SyntaxError
-        ? 400
-        : 500;
-    const message =
-      error instanceof Error ? error.message : "Unexpected conversion error.";
-    return json({ error: message }, status);
+    if (clientError) {
+      return json(
+        {
+          error:
+            error instanceof Error
+              ? error.message
+              : "Invalid conversion request.",
+        },
+        400,
+      );
+    }
+
+    console.error("Unexpected conversion API error.", error);
+    return json({ error: "Unexpected conversion error." }, 500);
   }
 }
 
