@@ -10,7 +10,7 @@ import {
   fromGeoref,
   fromMgrs,
   fromUtmUps,
-} from "@/lib/convert";
+} from "@convert-tools/core/geodesy";
 import { copyText } from "../common/clipboard";
 import { COORDINATE_FORMATS, COPY, OUTPUT_FORMATS } from "../config";
 import CoordinateInputFields from "./CoordinateInputFields";

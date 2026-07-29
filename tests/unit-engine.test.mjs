@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
   convertUnits,
   formatRational,
   parseDecimal,
-} from "../lib/precision-units.js";
+} from "@convert-tools/core/units";
 
 test("uluslararası deniz mili tam olarak 1852 metredir", () => {
   const result = convertUnits("1", "length", "nautical-mile", "metre");
@@ -58,7 +59,41 @@ test("uzun ondalık girdiler Number hassasiyetine düşmeden korunur", () => {
   assert.equal(roundTrip.value, "12345678901234567890123.456789012345678");
 });
 
+test("sonlu ama seçilen haneye sığmayan sonuç exact olarak işaretlenmez", () => {
+  const result = convertUnits(
+    "0.1234567890123456789012345",
+    "length",
+    "metre",
+    "metre",
+    24,
+  );
+  assert.equal(result.terminatingDecimal, true);
+  assert.equal(result.requiredFractionDigits, 25);
+  assert.equal(result.exactDecimal, false);
+  assert.equal(result.value, "0.123456789012345678901235");
+});
+
 test("Türkçe ondalık virgülü ve bilimsel gösterim desteklenir", () => {
   assert.equal(formatRational(parseDecimal("1,25"), 8), "1.25");
   assert.equal(formatRational(parseDecimal("3e-4"), 8), "0.0003");
+});
+
+test("JavaScript ortak birim sözleşmesi vektörlerini karşılar", async () => {
+  const source = await readFile(
+    new URL(
+      "../contracts/test-vectors/unit-conversions.csv",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+
+  for (const line of source.trim().split("\n").slice(1)) {
+    const [id, category, value, from, to, precision, expected] =
+      line.split(",");
+    assert.equal(
+      convertUnits(value, category, from, to, Number(precision)).value,
+      expected,
+      id,
+    );
+  }
 });

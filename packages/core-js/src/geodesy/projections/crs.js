@@ -1,0 +1,115 @@
+import { DEGREE, RADIAN, WGS84 } from "../core/ellipsoid.js";
+import {
+  compactNumber,
+  parseCoordinateNumber,
+  validatePoint,
+} from "../core/numbers.js";
+import {
+  upsForward,
+  upsInverse,
+  utmForward,
+  utmInverse,
+} from "./utm-ups.js";
+
+const SUPPORTED_FIXED_CODES = new Set([4326, 3857, 5041, 5042]);
+const WEB_MERCATOR_MAX_LATITUDE = 85.0511287798066;
+
+function epsgNumber(value) {
+  const source = String(value).trim().toUpperCase();
+  const normalized = source.startsWith("EPSG:") ? source : `EPSG:${source}`;
+  const match = normalized.match(/^EPSG:(\d+)$/);
+  if (!match) throw new Error("Use an EPSG code such as EPSG:4326.");
+  const number = Number(match[1]);
+  const isUtmNorth = number >= 32601 && number <= 32660;
+  const isUtmSouth = number >= 32701 && number <= 32760;
+  if (!SUPPORTED_FIXED_CODES.has(number) && !isUtmNorth && !isUtmSouth) {
+    throw new Error(`Projection definition is not available: ${normalized}.`);
+  }
+  return { code: normalized, number };
+}
+
+function toWgs84(definition, x, y) {
+  const { number } = definition;
+  if (number === 4326) return validatePoint(y, x);
+  if (number === 3857) {
+    if (Math.abs(y) > Math.PI * WGS84.a) {
+      throw new Error("Y is outside the Web Mercator domain.");
+    }
+    const longitude = (x / WGS84.a) * RADIAN;
+    const latitude =
+      (2 * Math.atan(Math.exp(y / WGS84.a)) - Math.PI / 2) * RADIAN;
+    return validatePoint(latitude, longitude);
+  }
+  if (number >= 32601 && number <= 32660) {
+    return utmInverse(number - 32600, true, x, y);
+  }
+  if (number >= 32701 && number <= 32760) {
+    return utmInverse(number - 32700, false, x, y);
+  }
+  return upsInverse(number === 5041, x, y);
+}
+
+function fromWgs84(definition, point) {
+  const { number } = definition;
+  if (number === 4326) return [point.longitude, point.latitude];
+  if (number === 3857) {
+    if (Math.abs(point.latitude) > WEB_MERCATOR_MAX_LATITUDE) {
+      throw new Error("Latitude is outside the Web Mercator domain.");
+    }
+    return [
+      WGS84.a * point.longitude * DEGREE,
+      WGS84.a *
+        Math.log(Math.tan(Math.PI / 4 + (point.latitude * DEGREE) / 2)),
+    ];
+  }
+  if (number >= 32601 && number <= 32660) {
+    if (point.latitude < 0) {
+      throw new Error("A northern UTM CRS cannot encode a southern point.");
+    }
+    const grid = utmForward(point.latitude, point.longitude, number - 32600);
+    return [grid.easting, grid.northing];
+  }
+  if (number >= 32701 && number <= 32760) {
+    if (point.latitude > 0) {
+      throw new Error("A southern UTM CRS cannot encode a northern point.");
+    }
+    const grid = utmForward(point.latitude, point.longitude, number - 32700);
+    return [grid.easting, grid.northing];
+  }
+  const north = number === 5041;
+  const grid = upsForward(point.latitude, point.longitude, north);
+  return [grid.easting, grid.northing];
+}
+
+export function normalizeEpsg(value) {
+  return epsgNumber(value).code;
+}
+
+export function transformCrs(sourceValue, targetValue, xValue, yValue) {
+  const source = epsgNumber(sourceValue);
+  const target = epsgNumber(targetValue);
+  const x = parseCoordinateNumber(xValue, "X");
+  const y = parseCoordinateNumber(yValue, "Y");
+  const point = toWgs84(source, x, y);
+  const [resultX, resultY] = fromWgs84(target, point);
+  if (!Number.isFinite(resultX) || !Number.isFinite(resultY)) {
+    throw new Error("The transformation did not produce finite coordinates.");
+  }
+  return {
+    source: source.code,
+    target: target.code,
+    x: resultX,
+    y: resultY,
+    formattedX: compactNumber(resultX, 8),
+    formattedY: compactNumber(resultY, 8),
+  };
+}
+
+export const SUPPORTED_CRS = Object.freeze([
+  "EPSG:4326",
+  "EPSG:3857",
+  "EPSG:32601–EPSG:32660",
+  "EPSG:32701–EPSG:32760",
+  "EPSG:5041",
+  "EPSG:5042",
+]);

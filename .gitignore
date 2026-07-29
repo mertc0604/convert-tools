@@ -37,7 +37,9 @@ yarn-error.log*
 
 # typescript
 next-env.d.ts
+*.tsbuildinfo
 /dist/
+/packages/core-java/target/
 /.wrangler/
 /outputs/
 /work/

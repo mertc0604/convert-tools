@@ -20,9 +20,11 @@ export const COPY = {
     invalid: "Geçerli bir sayı girin.",
     unitFooter: "Sonlu birim dönüşümleri kesin kesirlerle hesaplanır.",
     coordinateTitle: "Koordinat Çevirici",
-    coordinateSubtitle: "WGS 84 konum formatları ve EPSG dönüşümleri.",
+    coordinateSubtitle:
+      "WGS 84 konum formatları, EPSG dönüşümleri ve elipsoidal mesafe.",
     positionFormats: "Konum formatları",
     crs: "CRS / EPSG",
+    distance: "Mesafe",
     inputFormat: "Girdi formatı",
     precision: "MGRS hassasiyeti",
     convert: "Dönüştür",
@@ -50,8 +52,23 @@ export const COPY = {
       "X/Y sırası kullanılır. EPSG:4326 için X = boylam, Y = enlem.",
     availableEpsg:
       "Hazır tanımlar: WGS 84, Web Mercator, UTM zonları ve UPS.",
+    startPoint: "Başlangıç noktası",
+    endPoint: "Bitiş noktası",
+    startLatitude: "Başlangıç enlemi",
+    startLongitude: "Başlangıç boylamı",
+    endLatitude: "Bitiş enlemi",
+    endLongitude: "Bitiş boylamı",
+    measure: "Ölç",
+    metres: "Metre",
+    kilometres: "Kilometre",
+    nauticalMiles: "Deniz mili",
+    bearings: "Başlangıç → varış azimutu",
+    distanceInvalid:
+      "Mesafe hesaplanamadı. Enlem ve boylam değerlerini kontrol edin.",
+    distanceModel:
+      "WGS 84 elipsoidi üzerindeki en kısa yüzey yolu hesaplanır; Web Mercator düzlem mesafesi kullanılmaz.",
     coordinateFooter:
-      "Formatlar çevrimdışı çalışır; sonuçlar kullanım amacına uygun kaynakla doğrulanmalıdır.",
+      "Dönüşümler ve ölçümler çevrimdışı çalışır; sonuçlar kullanım amacına uygun kaynakla doğrulanmalıdır.",
   },
   en: {
     language: "Language",
@@ -74,9 +91,11 @@ export const COPY = {
     invalid: "Enter a valid number.",
     unitFooter: "Finite unit conversions are calculated with exact fractions.",
     coordinateTitle: "Coordinate Converter",
-    coordinateSubtitle: "WGS 84 position formats and EPSG transformations.",
+    coordinateSubtitle:
+      "WGS 84 position formats, EPSG transformations and ellipsoidal distance.",
     positionFormats: "Position formats",
     crs: "CRS / EPSG",
+    distance: "Distance",
     inputFormat: "Input format",
     precision: "MGRS precision",
     convert: "Convert",
@@ -104,8 +123,23 @@ export const COPY = {
       "X/Y order is used. For EPSG:4326, X = longitude and Y = latitude.",
     availableEpsg:
       "Built-in definitions: WGS 84, Web Mercator, UTM zones and UPS.",
+    startPoint: "Start point",
+    endPoint: "End point",
+    startLatitude: "Start latitude",
+    startLongitude: "Start longitude",
+    endLatitude: "End latitude",
+    endLongitude: "End longitude",
+    measure: "Measure",
+    metres: "Metres",
+    kilometres: "Kilometres",
+    nauticalMiles: "Nautical miles",
+    bearings: "Initial → final bearing",
+    distanceInvalid:
+      "The distance could not be calculated. Check the latitude and longitude values.",
+    distanceModel:
+      "Uses the shortest surface path on the WGS 84 ellipsoid; Web Mercator planar distance is not used.",
     coordinateFooter:
-      "Formats work offline; verify results against a source appropriate for the intended use.",
+      "Conversions and measurements work offline; verify results against a source appropriate for the intended use.",
   },
 };
 

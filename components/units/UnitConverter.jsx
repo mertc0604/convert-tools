@@ -5,7 +5,7 @@ import {
   UNIT_CATEGORIES,
   convertUnits,
   getCategory,
-} from "@/lib/convert";
+} from "@convert-tools/core/units";
 import {
   CATEGORY_LABELS,
   COPY,

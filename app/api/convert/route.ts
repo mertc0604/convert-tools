@@ -2,7 +2,7 @@ import {
   ConversionRequestError,
   apiCapabilities,
   convertRequest,
-} from "@/lib/convert/request";
+} from "@/lib/api";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",

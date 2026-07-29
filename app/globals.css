@@ -660,8 +660,25 @@ footer {
   margin-top: 12px;
 }
 
+.distance-point-heading {
+  margin: 0 0 9px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.distance-point-heading + .field-grid + .distance-point-heading {
+  margin-top: 16px;
+}
+
 .crs-form > .primary-button {
   margin-top: 16px;
+}
+
+.distance-results {
+  margin-top: 18px;
 }
 
 .crs-result {

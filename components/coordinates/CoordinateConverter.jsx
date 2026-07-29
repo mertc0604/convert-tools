@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { COPY } from "../config";
 import CrsConverter from "./CrsConverter";
+import DistanceCalculator from "./DistanceCalculator";
 import PositionConverter from "./PositionConverter";
 
 export default function CoordinateConverter({ language }) {
@@ -42,11 +43,22 @@ export default function CoordinateConverter({ language }) {
           >
             {text.crs}
           </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === "distance"}
+            className={mode === "distance" ? "active" : ""}
+            onClick={() => setMode("distance")}
+          >
+            {text.distance}
+          </button>
         </div>
         {mode === "formats" ? (
           <PositionConverter language={language} />
-        ) : (
+        ) : mode === "crs" ? (
           <CrsConverter language={language} />
+        ) : (
+          <DistanceCalculator language={language} />
         )}
       </section>
       <footer>{text.coordinateFooter}</footer>

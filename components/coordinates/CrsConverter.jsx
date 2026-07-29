@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { transformCrs } from "@/lib/convert";
+import { transformCrs } from "@convert-tools/core/geodesy";
 import { copyText } from "../common/clipboard";
 import TextField from "../common/TextField";
 import { COPY } from "../config";

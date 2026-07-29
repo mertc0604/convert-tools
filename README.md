@@ -1,42 +1,161 @@
 # Convert
 
-Türkçe ve İngilizce çalışan, çevrimdışı birim ve koordinat dönüştürücü.
-Dönüşüm motoru bu projenin kendi kodudur; fiziksel birim, DMS, MGRS,
-UTM/UPS, GARS, GEOREF veya EPSG dönüşümü için üçüncü taraf paket kullanmaz.
+Bağımsız fiziksel birim dönüşümü, koordinat formatları, CRS dönüşümü ve
+WGS 84 elipsoidal harita ölçümü sunan React uygulaması ile JavaScript/Java
+çekirdek kütüphaneleri.
 
-## Özellikler
+Hesap motorları dış dönüşüm paketi kullanmaz. React arayüzü, HTTP API ve Java
+uyarlaması aynı kimlikleri ve ortak referans vektörlerini kullanır.
+
+## Neler var?
 
 - Fiziksel birimler: uzunluk, hız, alan, açı, kütle, basınç ve sıcaklık
+- Harita ölçümü: iki nokta arası elipsoidal mesafe, başlangıç/varış azimutu
+  ve çok parçalı çizgi uzunluğu
 - WGS 84 formatları: DD, DMS, DDM, MGRS, UTM/UPS, GARS ve GEOREF
-- CRS: EPSG:4326, EPSG:3857, WGS 84 UTM ve UPS
-- MGRS: UTM ve polar UPS bölgeleri, 1 m–100 km hassasiyet
-- Türkçe/İngilizce arayüz ve kopyalanabilir sonuçlar
+- CRS: EPSG:4326, EPSG:3857, WGS 84 UTM zonları ve UPS
+- JavaScript paketi: `@convert-tools/core`
+- Java 17 çekirdeği: `io.github.mertc0604:convert-tools-core`
 - Aynı motoru kullanan JSON API: `GET/POST /api/convert`
+- Türkçe ve İngilizce React arayüzü
+
+## Sorumluluk sınırları
+
+`units` ve `geodesy` birbirinden ayrıdır:
+
+- `convertUnits(...)`, zaten bilinen bir fiziksel değerin birimini değiştirir.
+  Örneğin `1 NM → 1852 m`.
+- `inverseGeodesic(...)`, iki koordinattan WGS 84 yüzey mesafesini üretir.
+- `measureGeodesicPolyline(...)`, harita çizgisinin her segmentini geodezik
+  olarak ölçer ve telafili toplamla birleştirir.
+- `transformCrs(...)`, koordinat sistemini değiştirir; genel harita mesafesi
+  hesaplamak için projeksiyon X/Y farkı kullanılmaz.
 
 ## Mimari
 
 ```text
-app/
-  api/convert/route.ts       HTTP API
-components/
-  common/                    Ortak küçük bileşenler
-  coordinates/               Koordinat arayüzü
-  units/                     Birim arayüzü
-lib/convert/
-  coordinates/
-    crs.js                   EPSG dönüşüm yönlendirmesi
-    dms.js                   Açı ayrıştırma ve biçimleme
-    ellipsoid.js             WGS 84 sabitleri
-    grid-references.js       GARS ve GEOREF
-    mgrs.js                  MGRS kodlama/çözme
-    utm-ups.js               TM ve polar stereografik izdüşüm
-  index.js                   Kütüphanenin genel girişi
-  request.js                 API istek sözleşmesi
-tests/                       Referans, API ve render testleri
+app/                          React sayfası ve HTTP route
+components/                   Yalnız arayüz bileşenleri
+lib/api/                      HTTP istek/yanıt adaptörü
+
+packages/
+  core-js/
+    src/
+      exact/                  BigInt tabanlı kesin rasyonel matematik
+      units/
+        catalog/              Her fiziksel büyüklük ayrı dosyada
+        converter.js          Birim dönüşüm servisi
+        registry.js           Birim kataloğu
+      geodesy/
+        core/                 WGS 84 ve sayısal doğrulama
+        formats/              DMS / DDM
+        grids/                MGRS / GARS / GEOREF
+        projections/          UTM / UPS / CRS
+        measurement/          Inverse, direct ve polyline ölçümü
+      index.js                Kontrollü public API
+
+  core-java/
+    src/main/java/.../
+      units/                  Java exact birim motoru
+      geodesy/                Java WGS 84 ölçüm motoru
+
+contracts/test-vectors/       JS ve Java için ortak doğruluk vektörleri
+tests/                        Core, HTTP ve render testleri
 ```
 
-Arayüz, API ve proje içinden yapılan importlar aynı `lib/convert` motorunu
-kullanır. Böylece üç farklı yerde farklı hesap oluşmaz.
+React kodu hesap formülü içermez. HTTP katmanı da yalnızca public core API'yi
+çağırır. Böylece tarayıcı, sunucu ve başka projelerde aynı sonuç üretilir.
+
+## JavaScript kullanımı
+
+### Birim dönüşümü
+
+```js
+import { convertUnits } from "@convert-tools/core/units";
+
+const result = convertUnits(
+  "1",
+  "length",
+  "nautical-mile",
+  "metre",
+);
+
+console.log(result.value); // "1852"
+```
+
+### İki harita noktası arasındaki mesafe
+
+```js
+import { inverseGeodesic } from "@convert-tools/core/geodesy";
+
+const result = inverseGeodesic(
+  { latitude: 39.933365, longitude: 32.859742 },
+  { latitude: 41.008238, longitude: 28.978359 },
+);
+
+console.log(result.distanceMetres);
+console.log(result.initialBearingDegrees);
+```
+
+### GeoJSON / harita çizgisi uzunluğu
+
+GeoJSON koordinatları `[longitude, latitude]` sırasındadır. Core API ise isimli
+alan kullandığı için sıra hatası oluşmaz:
+
+```js
+import { measureGeodesicPolyline } from "@convert-tools/core/geodesy";
+
+const points = feature.geometry.coordinates.map(
+  ([longitude, latitude]) => ({ latitude, longitude }),
+);
+
+const measurement = measureGeodesicPolyline(points);
+console.log(measurement.distanceMetres);
+```
+
+Metre sonucunu NM, km veya mile çevirmek için ayrıca `convertUnits` çağrılır.
+Hesaplanan `number` sonucu hesap katmanında yuvarlanmaz; yuvarlama yalnız
+sunumda yapılır.
+
+## Java kullanımı
+
+```java
+GeoPoint ankara = new GeoPoint(39.933365, 32.859742);
+GeoPoint istanbul = new GeoPoint(41.008238, 28.978359);
+
+GeodesicResult result = Geodesic.inverse(ankara, istanbul);
+System.out.println(result.distanceMetres());
+```
+
+Java birim motoru aynı kategori/birim kimliklerini kullanır:
+
+```java
+UnitConversion result = UnitConverter.convert(
+    "1",
+    "length",
+    "nautical-mile",
+    "metre",
+    24
+);
+```
+
+Detaylar: [`packages/core-java/README.md`](packages/core-java/README.md)
+
+## HTTP API
+
+```bash
+curl -X POST http://127.0.0.1:5173/api/convert \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "geodesic",
+    "operation": "inverse",
+    "start": { "latitude": 39.933365, "longitude": 32.859742 },
+    "end": { "latitude": 41.008238, "longitude": 28.978359 },
+    "outputUnit": "nautical-mile"
+  }'
+```
+
+Tüm istekler için [`docs/API.md`](docs/API.md) belgesine bakın.
 
 ## Çalıştırma
 
@@ -47,75 +166,34 @@ pnpm install --ignore-scripts
 pnpm dev
 ```
 
-Ardından `http://127.0.0.1:5173/` adresini açın.
+Uygulama: `http://127.0.0.1:5173/`
 
 ```bash
 pnpm test
 pnpm lint
+pnpm typecheck
 ```
 
-## Proje içinden kullanım
+## Doğruluk modeli
 
-```js
-import { convertUnits, coordinateResults, fromMgrs } from "@/lib/convert";
+Fiziksel birim oranları JavaScript'te `BigInt`, Java'da `BigInteger` pay/payda
+olarak tutulur. Deniz mili tam `1852 m`, uluslararası ayak tam `0.3048 m`
+kabul edilir. NATO 6400 mil ile 6000'lik mil ayrı birimlerdir.
 
-const distance = convertUnits(
-  "1",
-  "length",
-  "nautical-mile",
-  "metre",
-);
+Harita ölçümü WGS 84 dönel elipsoidi üzerinde inverse/direct geodezik çözer.
+Normal çiftlerde hızlı iteratif inverse çözüm, antipodale yakın çiftlerde
+direct çözüm ve sönümlü sayısal atış yedeği kullanılır. Kalıcı test kümesindeki
+ekvator, antimeridyen, kutup ve antipodal vektörler bağımsız referanslara göre
+`1 mm` toleransla doğrulanır. Çok parçalı toplamda Neumaier telafili toplama
+kullanılır.
 
-const position = coordinateResults(
-  fromMgrs("38SLC3918701405"),
-  5,
-);
-```
+Bu değer elipsoit yüzey mesafesidir. Şunlarla aynı değildir:
 
-## API
+- EPSG:3857 üzerinde düz çizgi mesafesi
+- UTM grid mesafesi
+- rhumb line / sabit kerteriz yolu
+- rakım içeren 3B eğik mesafe
 
-```bash
-curl -X POST http://127.0.0.1:5173/api/convert \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "unit",
-    "category": "length",
-    "value": "1",
-    "from": "nautical-mile",
-    "to": "metre"
-  }'
-```
-
-Yanıt:
-
-```json
-{
-  "type": "unit",
-  "category": "length",
-  "input": { "value": "1", "unit": "nautical-mile", "symbol": "NM" },
-  "result": {
-    "value": "1852",
-    "unit": "metre",
-    "symbol": "m",
-    "exactDecimal": true,
-    "factor": "1852"
-  }
-}
-```
-
-Tüm istek biçimleri için [API belgesine](docs/API.md) bakın.
-
-## Hassasiyet
-
-Birim girdileri `Number` türüne dönüştürülmeden ayrıştırılır ve `BigInt`
-pay/payda değerleriyle hesaplanır. Uluslararası deniz mili tam `1852 m`,
-uluslararası ayak tam `0.3048 m` kabul edilir. NATO 6400 mil ile 6000'lik mil
-ayrı tutulur.
-
-Koordinat motoru WGS 84 elipsoidi üzerinde Transverse Mercator ve polar
-stereografik denklemleri uygular. Hücre tabanlı MGRS, GARS ve GEOREF girdileri
-merkez noktaya dönüştürülür. Referans vektörleri otomatik testlerle korunur.
-
-GARS bir alan referansıdır; navigasyon veya hedefleme amacıyla
-kullanılmamalıdır. Operasyonel sonuçlar yetkili veri ve yazılımla ayrıca
-doğrulanmalıdır.
+Sayısal doğruluk, kaynak koordinatın veya sensörün gerçek dünya doğruluğunu
+artırmaz. Operasyonel kullanımda datum, yükseklik modeli, cihaz hatası ve
+yetkili referans yazılımıyla bağımsız kabul testi ayrıca yapılmalıdır.

@@ -1,0 +1,40 @@
+{
+  "name": "@convert-tools/core",
+  "version": "1.1.0",
+  "description": "Dependency-free exact unit conversion and WGS84 geodesy core",
+  "keywords": [
+    "unit-conversion",
+    "wgs84",
+    "geodesy",
+    "mgrs",
+    "utm"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mertc0604/convert-tools.git",
+    "directory": "packages/core-js"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "default": "./src/index.js"
+    },
+    "./units": {
+      "types": "./src/units/index.d.ts",
+      "default": "./src/units/index.js"
+    },
+    "./geodesy": {
+      "types": "./src/geodesy/index.d.ts",
+      "default": "./src/geodesy/index.js"
+    }
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  }
+}

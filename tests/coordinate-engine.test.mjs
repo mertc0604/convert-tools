@@ -11,7 +11,7 @@ import {
   fromUtmUps,
   transformCrs,
   utmUpsForward,
-} from "../lib/coordinate-core.js";
+} from "@convert-tools/core/geodesy";
 
 const closeTo = (actual, expected, tolerance, message) => {
   assert.ok(

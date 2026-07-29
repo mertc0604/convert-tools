@@ -2,21 +2,74 @@ name: CI
 
 on:
   push:
-    branches: ["main"]
+    branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  verify:
+  javascript:
+    name: JavaScript
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
         with:
           version: 11.9.0
-      - uses: actions/setup-node@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 22.13.0
           cache: pnpm
-      - run: pnpm install --frozen-lockfile --ignore-scripts
-      - run: pnpm lint
-      - run: pnpm test
+
+      - name: Install
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Type-check package contracts
+        run: pnpm typecheck
+
+      - name: Test and build
+        run: pnpm test
+
+  java:
+    name: Java
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Build package
+        run: mvn --batch-mode --file packages/core-java/pom.xml package
+
+      - name: Compile contract checks
+        run: |
+          mkdir -p build/java-contract
+          find packages/core-java/src/main/java packages/core-java/src/test/java \
+            -name '*.java' -print0 \
+            | xargs -0 javac --release 17 -Xlint:all -Werror \
+                -d build/java-contract
+
+      - name: Run shared contract checks
+        run: |
+          java -ea -cp build/java-contract \
+            io.github.mertc0604.converttools.ContractTest \
+            contracts/test-vectors
