@@ -6,9 +6,9 @@
 
   <groupId>io.github.mertc0604</groupId>
   <artifactId>convert-tools-core</artifactId>
-  <version>1.1.0</version>
+  <version>2.0.0</version>
   <name>Convert Tools Core</name>
-  <description>Dependency-free exact unit conversion and WGS84 geodesy core</description>
+  <description>Dependency-free exact length, coordinate conversion and WGS84 geodesy core</description>
 
   <properties>
     <maven.compiler.release>17</maven.compiler.release>

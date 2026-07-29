@@ -10,15 +10,14 @@ export function encodeGeoref(longitudeValue, latitudeValue, precision = 4) {
   }
 
   const safeLongitude = longitude === 180 ? -180 : longitude;
-  const safeLatitude = latitude === 90 ? 90 - Number.EPSILON * 64 : latitude;
   const shiftedLongitude = safeLongitude + 180;
-  const shiftedLatitude = safeLatitude + 90;
+  const shiftedLatitude = latitude + 90;
   const longitudeZone = Math.floor(shiftedLongitude / 15);
-  const latitudeZone = Math.floor(shiftedLatitude / 15);
+  const latitudeZone = Math.min(11, Math.floor(shiftedLatitude / 15));
   const longitudeWithinZone = shiftedLongitude - longitudeZone * 15;
   const latitudeWithinZone = shiftedLatitude - latitudeZone * 15;
   const longitudeDegree = Math.floor(longitudeWithinZone);
-  const latitudeDegree = Math.floor(latitudeWithinZone);
+  const latitudeDegree = Math.min(14, Math.floor(latitudeWithinZone));
 
   let result =
     ALPHABET[longitudeZone] +
@@ -31,8 +30,15 @@ export function encodeGeoref(longitudeValue, latitudeValue, precision = 4) {
     const divisor = precision === 1 ? 10 : 1 / scale;
     const longitudeMinutes = (longitudeWithinZone - longitudeDegree) * 60;
     const latitudeMinutes = (latitudeWithinZone - latitudeDegree) * 60;
-    const longitudeDigits = Math.floor(longitudeMinutes / divisor + 1e-10);
-    const latitudeDigits = Math.floor(latitudeMinutes / divisor + 1e-10);
+    const maximumDigits = Math.floor(60 / divisor) - 1;
+    const longitudeDigits = Math.min(
+      maximumDigits,
+      Math.floor(longitudeMinutes / divisor + 1e-10),
+    );
+    const latitudeDigits = Math.min(
+      maximumDigits,
+      Math.floor(latitudeMinutes / divisor + 1e-10),
+    );
     result += String(longitudeDigits).padStart(precision, "0");
     result += String(latitudeDigits).padStart(precision, "0");
   }

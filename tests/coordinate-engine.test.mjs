@@ -1,16 +1,26 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
   coordinateResults,
+  decodeGars,
   decodeGeoref,
+  decodeMgrs,
+  encodeGars,
   encodeGeoref,
+  encodeMgrs,
+  formatDdm,
+  formatDms,
   fromDecimalDegrees,
+  fromDdm,
   fromDms,
   fromGars,
   fromMgrs,
   fromUtmUps,
+  inverseGeodesic,
   transformCrs,
   utmUpsForward,
+  utmUpsInverse,
 } from "@convert-tools/core/geodesy";
 
 const closeTo = (actual, expected, tolerance, message) => {
@@ -19,6 +29,171 @@ const closeTo = (actual, expected, tolerance, message) => {
     `${message}: ${actual} ≉ ${expected}`,
   );
 };
+
+const longitudeDifference = (first, second) =>
+  Math.abs((((first - second) + 540) % 360) - 180);
+
+const spatialDistanceMetres = (first, second) =>
+  inverseGeodesic(first, second).distanceMetres;
+
+const COORDINATE_VECTOR_COLUMNS = Object.freeze([
+  "id",
+  "operation",
+  "latitude",
+  "longitude",
+  "target_crs",
+  "expected_zone",
+  "expected_hemisphere",
+  "expected_x",
+  "expected_y",
+  "output_tolerance",
+  "roundtrip_tolerance_degrees",
+]);
+
+function coordinateProjectionVectors() {
+  const source = readFileSync(
+    new URL(
+      "../contracts/test-vectors/coordinate-projections.csv",
+      import.meta.url,
+    ),
+    "utf8",
+  ).trim();
+  const [header, ...rows] = source.split(/\r?\n/);
+  assert.deepEqual(header.split(","), COORDINATE_VECTOR_COLUMNS);
+
+  return rows.map((row, index) => {
+    const fields = row.split(",");
+    assert.equal(
+      fields.length,
+      COORDINATE_VECTOR_COLUMNS.length,
+      `coordinate vector row ${index + 2}`,
+    );
+    const values = Object.fromEntries(
+      COORDINATE_VECTOR_COLUMNS.map((column, fieldIndex) => [
+        column,
+        fields[fieldIndex],
+      ]),
+    );
+    return {
+      id: values.id,
+      operation: values.operation,
+      latitude: Number(values.latitude),
+      longitude: Number(values.longitude),
+      targetCrs: values.target_crs,
+      expectedZone:
+        values.expected_zone === ""
+          ? null
+          : Number(values.expected_zone),
+      expectedHemisphere: values.expected_hemisphere,
+      expectedX: Number(values.expected_x),
+      expectedY: Number(values.expected_y),
+      outputTolerance: Number(values.output_tolerance),
+      roundTripToleranceDegrees: Number(
+        values.roundtrip_tolerance_degrees,
+      ),
+    };
+  });
+}
+
+function deterministicPoints(
+  count,
+  minimumLatitude,
+  maximumLatitude,
+  seed,
+) {
+  let state = seed >>> 0;
+  const random = () => {
+    state =
+      (Math.imul(state, 1664525) + 1013904223) >>> 0;
+    return state / 2 ** 32;
+  };
+
+  return Array.from({ length: count }, () => ({
+    latitude:
+      minimumLatitude +
+      random() * (maximumLatitude - minimumLatitude),
+    longitude: -180 + random() * 360,
+  }));
+}
+
+test("ortak DD projeksiyon vektörleri UTM, UPS ve CRS sonuçlarını doğrular", () => {
+  for (const vector of coordinateProjectionVectors()) {
+    let actualX;
+    let actualY;
+    let restored;
+
+    if (vector.operation === "UTM_UPS") {
+      const grid = utmUpsForward(
+        vector.latitude,
+        vector.longitude,
+      );
+      assert.equal(grid.zone, vector.expectedZone, vector.id);
+      assert.equal(
+        grid.north ? "N" : "S",
+        vector.expectedHemisphere,
+        vector.id,
+      );
+      actualX = grid.easting;
+      actualY = grid.northing;
+      restored = utmUpsInverse(
+        grid.zone,
+        grid.north,
+        grid.easting,
+        grid.northing,
+      );
+    } else {
+      assert.equal(vector.operation, "CRS", vector.id);
+      const projected = transformCrs(
+        "EPSG:4326",
+        vector.targetCrs,
+        vector.longitude,
+        vector.latitude,
+      );
+      assert.equal(projected.source, "EPSG:4326", vector.id);
+      assert.equal(projected.target, vector.targetCrs, vector.id);
+      actualX = projected.x;
+      actualY = projected.y;
+      const reverse = transformCrs(
+        vector.targetCrs,
+        "EPSG:4326",
+        projected.x,
+        projected.y,
+      );
+      restored = {
+        latitude: reverse.y,
+        longitude: reverse.x,
+      };
+    }
+
+    closeTo(
+      actualX,
+      vector.expectedX,
+      vector.outputTolerance,
+      `${vector.id} X`,
+    );
+    closeTo(
+      actualY,
+      vector.expectedY,
+      vector.outputTolerance,
+      `${vector.id} Y`,
+    );
+    closeTo(
+      restored.latitude,
+      vector.latitude,
+      vector.roundTripToleranceDegrees,
+      `${vector.id} round-trip latitude`,
+    );
+    if (Math.abs(vector.latitude) < 90) {
+      assert.ok(
+        longitudeDifference(
+          restored.longitude,
+          vector.longitude,
+        ) <= vector.roundTripToleranceDegrees,
+        `${vector.id} round-trip longitude`,
+      );
+    }
+  }
+});
 
 test("Ramadi test noktası 1 metre hassasiyetli MGRS üretir", () => {
   const result = coordinateResults(fromDecimalDegrees(33.44, 43.27), 5);
@@ -64,6 +239,20 @@ test("DMS girdi çözümlemesi ve biçimlemesi yön harflerini korur", () => {
   const result = coordinateResults(point, 5);
   assert.match(result.dms, /N/);
   assert.match(result.dms, /E/);
+  assert.throws(
+    () => fromDms("39d56m00.114s", `032°51'35.0712"E`),
+    /ambiguous/i,
+  );
+  assert.throws(
+    () => fromDms("39d56m00.114sN", `032°51'35.0712"E`),
+    /multiple hemispheres/i,
+  );
+  closeTo(
+    fromDms(`39°56'00.114"S`, `032°51'35.0712"E`).latitude,
+    -39.933365,
+    1e-12,
+    "explicit south latitude",
+  );
 });
 
 test("GARS referans örneği üretilir ve hücre merkezine çözülür", () => {
@@ -128,4 +317,322 @@ test("Tanımsız EPSG kodu açıkça reddedilir", () => {
     () => transformCrs("EPSG:4326", "EPSG:999999", 0, 0),
     /not available/i,
   );
+});
+
+test("çıktılar yuvarlama ve hücre çözünürlüklerini açıkça bildirir", () => {
+  const result = coordinateResults(
+    fromDecimalDegrees(39.933365, 32.859742),
+    3,
+  );
+
+  assert.deepEqual(result.resolution.dd, {
+    kind: "angular-rounding",
+    stepDegrees: 1e-10,
+    maximumErrorDegrees: 5e-11,
+  });
+  assert.equal(
+    result.resolution.dms.stepDegrees,
+    1e-5 / 3600,
+  );
+  assert.equal(
+    result.resolution.ddm.stepDegrees,
+    1e-7 / 60,
+  );
+  assert.deepEqual(result.resolution.mgrs, {
+    kind: "grid-cell",
+    cellMetres: 100,
+    decodedPoint: "cell-center",
+    maximumCenterOffsetMetres: 100 * Math.SQRT1_2,
+  });
+  assert.deepEqual(result.resolution.utmUps, {
+    kind: "grid-rounding",
+    stepMetres: 0.001,
+    maximumErrorMetresPerAxis: 0.0005,
+  });
+  assert.equal(result.resolution.gars.cellDegrees, 1 / 12);
+  assert.equal(result.resolution.georef.cellDegrees, 1 / 6000);
+});
+
+test("coordinateResults tip sözleşmesindeki ondalık metinleri kabul eder", () => {
+  const result = coordinateResults({
+    latitude: "39.933365",
+    longitude: "32.859742",
+  });
+  assert.equal(result.latitude, 39.933365);
+  assert.equal(result.longitude, 32.859742);
+});
+
+test("DMS ve DDM biçimleri belirtilen açısal çözünürlükte geri döner", () => {
+  const points = [
+    { latitude: -90, longitude: -180 },
+    { latitude: 90, longitude: 180 },
+    { latitude: 0, longitude: 0 },
+    { latitude: 84, longitude: 179.999999999 },
+    { latitude: -80, longitude: -179.999999999 },
+    ...deterministicPoints(500, -90, 90, 0xd15ea5e),
+  ];
+  const dmsToleranceDegrees = 1e-5 / 7200 + 1e-14;
+  const ddmToleranceDegrees = 1e-7 / 120 + 1e-14;
+
+  for (const point of points) {
+    const dmsLatitude = formatDms(point.latitude, "latitude");
+    const dmsLongitude = formatDms(point.longitude, "longitude");
+    const dmsRoundTrip = fromDms(dmsLatitude, dmsLongitude);
+    closeTo(
+      dmsRoundTrip.latitude,
+      point.latitude,
+      dmsToleranceDegrees,
+      "DMS latitude",
+    );
+    assert.ok(
+      longitudeDifference(
+        dmsRoundTrip.longitude,
+        point.longitude,
+      ) <= dmsToleranceDegrees,
+      "DMS longitude",
+    );
+    assert.equal(
+      formatDms(dmsRoundTrip.latitude, "latitude"),
+      dmsLatitude,
+    );
+    assert.equal(
+      formatDms(dmsRoundTrip.longitude, "longitude"),
+      dmsLongitude,
+    );
+
+    const ddmLatitude = formatDdm(point.latitude, "latitude");
+    const ddmLongitude = formatDdm(point.longitude, "longitude");
+    const ddmRoundTrip = fromDdm(ddmLatitude, ddmLongitude);
+    closeTo(
+      ddmRoundTrip.latitude,
+      point.latitude,
+      ddmToleranceDegrees,
+      "DDM latitude",
+    );
+    assert.ok(
+      longitudeDifference(
+        ddmRoundTrip.longitude,
+        point.longitude,
+      ) <= ddmToleranceDegrees,
+      "DDM longitude",
+    );
+    assert.equal(
+      formatDdm(ddmRoundTrip.latitude, "latitude"),
+      ddmLatitude,
+    );
+    assert.equal(
+      formatDdm(ddmRoundTrip.longitude, "longitude"),
+      ddmLongitude,
+    );
+  }
+});
+
+test("UTM ve UPS sayısal geri dönüşü mikrometre sınırında kalır", () => {
+  const points = [
+    { latitude: 39.933365, longitude: 32.859742 },
+    { latitude: 0, longitude: 0 },
+    { latitude: -80, longitude: 0 },
+    { latitude: 83.999999999, longitude: 0 },
+    { latitude: 56, longitude: 3 },
+    { latitude: 63.999999, longitude: 11.999999 },
+    { latitude: 72, longitude: 8.999999 },
+    { latitude: 72, longitude: 20.999999 },
+    { latitude: 72, longitude: 32.999999 },
+    { latitude: 72, longitude: 41.999999 },
+    { latitude: 85, longitude: 179.999999 },
+    { latitude: -85, longitude: -179.999999 },
+    ...deterministicPoints(1_000, -89.999999, 89.999999, 0x5eed1234),
+  ];
+
+  for (const point of points) {
+    const grid = utmUpsForward(
+      point.latitude,
+      point.longitude,
+    );
+    const restored = utmUpsInverse(
+      grid.zone,
+      grid.north,
+      grid.easting,
+      grid.northing,
+    );
+    assert.ok(
+      spatialDistanceMetres(point, restored) <= 1e-6,
+      `UTM/UPS round-trip: ${JSON.stringify(point)}`,
+    );
+  }
+
+  const pole = { latitude: 90, longitude: 47 };
+  const poleGrid = utmUpsForward(pole.latitude, pole.longitude);
+  const restoredPole = utmUpsInverse(
+    poleGrid.zone,
+    poleGrid.north,
+    poleGrid.easting,
+    poleGrid.northing,
+  );
+  closeTo(restoredPole.latitude, 90, 1e-12, "pole latitude");
+  const reprojectedPole = utmUpsForward(
+    restoredPole.latitude,
+    restoredPole.longitude,
+  );
+  closeTo(
+    reprojectedPole.easting,
+    poleGrid.easting,
+    1e-9,
+    "pole easting",
+  );
+  closeTo(
+    reprojectedPole.northing,
+    poleGrid.northing,
+    1e-9,
+    "pole northing",
+  );
+});
+
+test("Web Mercator sınırlar ve antimeridyen dahil konumsal olarak geri döner", () => {
+  const maximumLatitude = 85.0511287798066;
+  const points = [
+    { latitude: 0, longitude: -180 },
+    { latitude: 0, longitude: 180 },
+    { latitude: maximumLatitude, longitude: 180 },
+    { latitude: -maximumLatitude, longitude: -180 },
+    ...deterministicPoints(
+      500,
+      -maximumLatitude,
+      maximumLatitude,
+      0x38574326,
+    ),
+  ];
+
+  for (const point of points) {
+    const projected = transformCrs(
+      "EPSG:4326",
+      "EPSG:3857",
+      point.longitude,
+      point.latitude,
+    );
+    const restored = transformCrs(
+      "EPSG:3857",
+      "EPSG:4326",
+      projected.x,
+      projected.y,
+    );
+    assert.ok(
+      spatialDistanceMetres(point, {
+        latitude: restored.y,
+        longitude: restored.x,
+      }) <= 1e-6,
+      `Web Mercator round-trip: ${JSON.stringify(point)}`,
+    );
+  }
+});
+
+test("GARS sınırları geçerli hücrelere kapanır ve hücre merkezini döndürür", () => {
+  const points = [
+    { latitude: -90, longitude: -180 },
+    { latitude: 90, longitude: 180 },
+    { latitude: 90, longitude: 0 },
+    { latitude: 0, longitude: 180 },
+    ...deterministicPoints(500, -90, 90, 0x6a725),
+  ];
+
+  for (const point of points) {
+    const code = encodeGars(point.longitude, point.latitude);
+    const decoded = decodeGars(code);
+    assert.ok(
+      Math.abs(decoded.latitude - point.latitude) <=
+        decoded.cellDegrees / 2 + 1e-12,
+      `GARS latitude containment: ${code}`,
+    );
+    assert.ok(
+      longitudeDifference(decoded.longitude, point.longitude) <=
+        decoded.cellDegrees / 2 + 1e-12,
+      `GARS longitude containment: ${code}`,
+    );
+    assert.equal(
+      encodeGars(decoded.longitude, decoded.latitude),
+      code,
+    );
+  }
+});
+
+test("GEOREF tüm çözünürlüklerde kutup ve antimeridyen hücrelerini korur", () => {
+  const points = [
+    { latitude: -90, longitude: -180 },
+    { latitude: 90, longitude: 180 },
+    { latitude: 90, longitude: 0 },
+    { latitude: 0, longitude: 180 },
+    ...deterministicPoints(250, -90, 90, 0x6e0ef),
+  ];
+
+  for (let precision = 0; precision <= 5; precision += 1) {
+    for (const point of points) {
+      const code = encodeGeoref(
+        point.longitude,
+        point.latitude,
+        precision,
+      );
+      const decoded = decodeGeoref(code);
+      assert.ok(
+        Math.abs(decoded.latitude - point.latitude) <=
+          decoded.cellDegrees / 2 + 1e-12,
+        `GEOREF latitude containment: ${code}`,
+      );
+      assert.ok(
+        longitudeDifference(decoded.longitude, point.longitude) <=
+          decoded.cellDegrees / 2 + 1e-12,
+        `GEOREF longitude containment: ${code}`,
+      );
+      assert.equal(
+        encodeGeoref(
+          decoded.longitude,
+          decoded.latitude,
+          precision,
+        ),
+        code,
+      );
+    }
+  }
+});
+
+test("MGRS geri dönüşü metin eşitliği yerine kaynak hücre kapsamını korur", () => {
+  const points = [
+    { latitude: 0, longitude: 0 },
+    { latitude: 0, longitude: -180 },
+    { latitude: 0, longitude: 180 },
+    { latitude: -80, longitude: 0 },
+    { latitude: 84, longitude: 0 },
+    { latitude: 56, longitude: 3 },
+    { latitude: 72, longitude: 9 },
+    { latitude: 72, longitude: 21 },
+    { latitude: 90, longitude: 0 },
+    { latitude: -90, longitude: 0 },
+    ...deterministicPoints(250, -90, 90, 0x4d675),
+  ];
+
+  for (let precision = 0; precision <= 5; precision += 1) {
+    for (const point of points) {
+      const sourceGrid = utmUpsForward(
+        point.latitude,
+        point.longitude,
+      );
+      const code = encodeMgrs(
+        point.latitude,
+        point.longitude,
+        precision,
+      );
+      const decoded = decodeMgrs(code, true);
+      assert.equal(decoded.zone, sourceGrid.zone, code);
+      assert.equal(decoded.north, sourceGrid.north, code);
+      assert.ok(
+        Math.abs(decoded.easting - sourceGrid.easting) <=
+          decoded.cellMetres / 2 + 1e-7,
+        `MGRS easting containment: ${code}`,
+      );
+      assert.ok(
+        Math.abs(decoded.northing - sourceGrid.northing) <=
+          decoded.cellMetres / 2 + 1e-7,
+        `MGRS northing containment: ${code}`,
+      );
+    }
+  }
 });

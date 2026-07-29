@@ -1,9 +1,10 @@
 {
   "name": "@convert-tools/core",
-  "version": "1.1.0",
-  "description": "Dependency-free exact unit conversion and WGS84 geodesy core",
+  "version": "2.0.0",
+  "description": "Dependency-free exact length, coordinate conversion and WGS84 geodesy core",
   "keywords": [
     "unit-conversion",
+    "length-conversion",
     "wgs84",
     "geodesy",
     "mgrs",
@@ -22,6 +23,10 @@
       "default": "./src/index.js"
     },
     "./units": {
+      "types": "./src/units/index.d.ts",
+      "default": "./src/units/index.js"
+    },
+    "./length": {
       "types": "./src/units/index.d.ts",
       "default": "./src/units/index.js"
     },

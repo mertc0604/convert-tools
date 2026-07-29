@@ -5,14 +5,17 @@ import java.util.Objects;
 public record UnitDefinition(
         String id,
         String symbol,
-        Rational scale,
-        Rational offset
+        Rational metresPerUnit
 ) {
     public UnitDefinition {
         Objects.requireNonNull(id, "id");
         Objects.requireNonNull(symbol, "symbol");
-        Objects.requireNonNull(scale, "scale");
-        Objects.requireNonNull(offset, "offset");
+        Objects.requireNonNull(metresPerUnit, "metresPerUnit");
+        if (metresPerUnit.numerator().signum() <= 0) {
+            throw new IllegalArgumentException(
+                    "metresPerUnit must be positive."
+            );
+        }
     }
 
     public static UnitDefinition linear(
@@ -23,8 +26,7 @@ public record UnitDefinition(
         return new UnitDefinition(
                 id,
                 symbol,
-                Rational.parse(scale),
-                Rational.parse("0")
+                Rational.parse(scale)
         );
     }
 
@@ -37,17 +39,7 @@ public record UnitDefinition(
         return new UnitDefinition(
                 id,
                 symbol,
-                Rational.of(numerator, denominator),
-                Rational.parse("0")
+                Rational.of(numerator, denominator)
         );
-    }
-
-    public static UnitDefinition affine(
-            String id,
-            String symbol,
-            Rational scale,
-            Rational offset
-    ) {
-        return new UnitDefinition(id, symbol, scale, offset);
     }
 }

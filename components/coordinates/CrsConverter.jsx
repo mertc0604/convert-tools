@@ -41,6 +41,7 @@ export default function CrsConverter({ language }) {
   );
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
+  const [isCurrent, setIsCurrent] = useState(true);
 
   function runTransform(event) {
     event?.preventDefault();
@@ -48,8 +49,37 @@ export default function CrsConverter({ language }) {
       setResult(transformCrs(source, target, x, y));
       setError("");
       setCopied(false);
+      setIsCurrent(true);
     } catch {
       setError(text.crsInvalid);
+      setIsCurrent(false);
+    }
+  }
+
+  function reverseResult() {
+    if (error || !isCurrent) return;
+    try {
+      const nextSource = target;
+      const nextTarget = source;
+      const nextX = String(result.x);
+      const nextY = String(result.y);
+      const nextResult = transformCrs(
+        nextSource,
+        nextTarget,
+        nextX,
+        nextY,
+      );
+      setSource(nextSource);
+      setTarget(nextTarget);
+      setX(nextX);
+      setY(nextY);
+      setResult(nextResult);
+      setError("");
+      setCopied(false);
+      setIsCurrent(true);
+    } catch {
+      setError(text.crsInvalid);
+      setIsCurrent(false);
     }
   }
 
@@ -68,8 +98,11 @@ export default function CrsConverter({ language }) {
         ),
       );
       setError("");
+      setCopied(false);
+      setIsCurrent(true);
     } catch {
       setError(text.crsInvalid);
+      setIsCurrent(false);
     }
   }
 
@@ -80,14 +113,22 @@ export default function CrsConverter({ language }) {
           id="source-crs"
           label={text.sourceCrs}
           value={source}
-          onChange={setSource}
+          onChange={(value) => {
+            setSource(value);
+            setCopied(false);
+            setIsCurrent(false);
+          }}
           placeholder="EPSG:4326"
         />
         <TextField
           id="target-crs"
           label={text.targetCrs}
           value={target}
-          onChange={setTarget}
+          onChange={(value) => {
+            setTarget(value);
+            setCopied(false);
+            setIsCurrent(false);
+          }}
           placeholder="EPSG:3857"
         />
       </div>
@@ -96,7 +137,11 @@ export default function CrsConverter({ language }) {
           id="source-x"
           label="X"
           value={x}
-          onChange={setX}
+          onChange={(value) => {
+            setX(value);
+            setCopied(false);
+            setIsCurrent(false);
+          }}
           placeholder="32.859742"
           inputMode="decimal"
         />
@@ -104,21 +149,35 @@ export default function CrsConverter({ language }) {
           id="source-y"
           label="Y"
           value={y}
-          onChange={setY}
+          onChange={(value) => {
+            setY(value);
+            setCopied(false);
+            setIsCurrent(false);
+          }}
           placeholder="39.933365"
           inputMode="decimal"
         />
       </div>
-      <button className="primary-button" type="submit">
-        {text.transform}
-      </button>
+      <div className="crs-actions">
+        <button className="primary-button" type="submit">
+          {text.transform}
+        </button>
+        <button
+          className="secondary-button"
+          type="button"
+          onClick={reverseResult}
+          disabled={Boolean(error) || !isCurrent}
+        >
+          {text.swapCrs}
+        </button>
+      </div>
       {error && (
         <p className="form-error" role="alert">
           {error}
         </p>
       )}
 
-      {!error && (
+      {!error && isCurrent && (
         <article className="crs-result" aria-live="polite">
           <div>
             <span>
@@ -126,6 +185,7 @@ export default function CrsConverter({ language }) {
             </span>
             <button
               type="button"
+              aria-label={`${text.copy} ${result.target}`}
               onClick={async () => {
                 await copyText(`${result.formattedX}, ${result.formattedY}`);
                 setCopied(true);

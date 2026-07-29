@@ -1,5 +1,6 @@
 import {
   ConversionRequestError,
+  MAX_API_REQUEST_BODY_BYTES,
   apiCapabilities,
   convertRequest,
 } from "@/lib/api";
@@ -18,9 +19,45 @@ export function GET() {
   return json(apiCapabilities());
 }
 
+async function readJsonPayload(request: Request) {
+  const contentLength = request.headers.get("content-length");
+  if (
+    contentLength !== null &&
+    Number.isFinite(Number(contentLength)) &&
+    Number(contentLength) > MAX_API_REQUEST_BODY_BYTES
+  ) {
+    throw new ConversionRequestError(
+      `Request body must not exceed ${MAX_API_REQUEST_BODY_BYTES} bytes.`,
+    );
+  }
+
+  const reader = request.body?.getReader();
+  if (!reader) {
+    throw new SyntaxError("Request body is empty.");
+  }
+
+  const decoder = new TextDecoder();
+  let byteCount = 0;
+  let source = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    byteCount += value.byteLength;
+    if (byteCount > MAX_API_REQUEST_BODY_BYTES) {
+      await reader.cancel();
+      throw new ConversionRequestError(
+        `Request body must not exceed ${MAX_API_REQUEST_BODY_BYTES} bytes.`,
+      );
+    }
+    source += decoder.decode(value, { stream: true });
+  }
+  source += decoder.decode();
+  return JSON.parse(source);
+}
+
 export async function POST(request: Request) {
   try {
-    const payload = await request.json();
+    const payload = await readJsonPayload(request);
     return json(convertRequest(payload));
   } catch (error) {
     const status =

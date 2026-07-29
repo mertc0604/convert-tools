@@ -3,6 +3,20 @@ export interface Rational {
   readonly d: bigint;
 }
 
+export interface JsonRational {
+  readonly numerator: string;
+  readonly denominator: string;
+}
+
+export type RationalComponent = string | number | bigint;
+export type RationalInput =
+  | string
+  | number
+  | bigint
+  | Rational
+  | JsonRational
+  | readonly [RationalComponent, RationalComponent];
+
 export interface UnitDefinition {
   readonly id: string;
   readonly label: string;
@@ -23,12 +37,22 @@ export interface UnitCategory {
 export interface UnitConversion {
   readonly rational: Rational;
   readonly value: string;
+  readonly exactValue: JsonRational;
+  readonly exactMetres: JsonRational | null;
+  readonly exactFactor: JsonRational;
   readonly exactDecimal: boolean;
+  readonly rounded: boolean;
   readonly terminatingDecimal: boolean;
   readonly requiredFractionDigits: number | null;
+  readonly precision: number;
+  readonly roundingMode: "HALF_UP";
   readonly factor: string;
   readonly from: UnitDefinition;
   readonly to: UnitDefinition;
+}
+
+export interface LengthConversion extends UnitConversion {
+  readonly exactMetres: JsonRational;
 }
 
 export interface GeoPoint {
@@ -91,8 +115,10 @@ export const WGS84: Readonly<Ellipsoid & {
 }>;
 
 export function parseDecimal(input: string | number | bigint): Rational;
+export function toRational(input: RationalInput): Rational;
+export function rationalToJson(input: RationalInput): JsonRational;
 export function formatRational(
-  value: Rational,
+  value: RationalInput,
   maximumFractionDigits?: number,
 ): string;
 export function getCategory(categoryId: string): UnitCategory | undefined;
@@ -101,14 +127,20 @@ export function getUnit(
   unitId: string,
 ): UnitDefinition | undefined;
 export function convertUnits(
-  input: string | number | bigint,
+  input: RationalInput,
   categoryId: string,
   fromId: string,
   toId: string,
   precision?: number,
 ): UnitConversion;
+export function convertLength(
+  input: RationalInput,
+  fromId: string,
+  toId: string,
+  precision?: number,
+): LengthConversion;
 export function convertToAll(
-  input: string | number | bigint,
+  input: RationalInput,
   categoryId: string,
   fromId: string,
   precision?: number,
@@ -165,6 +197,46 @@ export function coordinateResults(
   readonly utmUps: string;
   readonly gars: string;
   readonly georef: string;
+  readonly resolution: {
+    readonly dd: {
+      readonly kind: "angular-rounding";
+      readonly stepDegrees: number;
+      readonly maximumErrorDegrees: number;
+    };
+    readonly dms: {
+      readonly kind: "angular-rounding";
+      readonly stepDegrees: number;
+      readonly maximumErrorDegrees: number;
+    };
+    readonly ddm: {
+      readonly kind: "angular-rounding";
+      readonly stepDegrees: number;
+      readonly maximumErrorDegrees: number;
+    };
+    readonly mgrs: {
+      readonly kind: "grid-cell";
+      readonly cellMetres: number;
+      readonly decodedPoint: "cell-center";
+      readonly maximumCenterOffsetMetres: number;
+    };
+    readonly utmUps: {
+      readonly kind: "grid-rounding";
+      readonly stepMetres: number;
+      readonly maximumErrorMetresPerAxis: number;
+    };
+    readonly gars: {
+      readonly kind: "angular-cell";
+      readonly cellDegrees: number;
+      readonly decodedPoint: "cell-center";
+      readonly maximumCenterOffsetDegreesPerAxis: number;
+    };
+    readonly georef: {
+      readonly kind: "angular-cell";
+      readonly cellDegrees: number;
+      readonly decodedPoint: "cell-center";
+      readonly maximumCenterOffsetDegreesPerAxis: number;
+    };
+  };
   readonly sourceKind: string;
   readonly sourceCellMetres?: number;
   readonly sourceCellDegrees?: number;

@@ -1,15 +1,15 @@
 # Convert
 
-Bağımsız fiziksel birim dönüşümü, koordinat formatları, CRS dönüşümü ve
-WGS 84 elipsoidal harita ölçümü sunan React uygulaması ile JavaScript/Java
-çekirdek kütüphaneleri.
+Kesin uzunluk dönüşümü, koordinat formatları, CRS dönüşümü ve WGS 84
+elipsoidal harita ölçümü sunan React uygulaması ile JavaScript/Java çekirdek
+kütüphaneleri.
 
 Hesap motorları dış dönüşüm paketi kullanmaz. React arayüzü, HTTP API ve Java
 uyarlaması aynı kimlikleri ve ortak referans vektörlerini kullanır.
 
 ## Neler var?
 
-- Fiziksel birimler: uzunluk, hız, alan, açı, kütle, basınç ve sıcaklık
+- Uzunluk: mm, cm, m, km, inç, ayak, yarda, kara mili ve deniz mili
 - Harita ölçümü: iki nokta arası elipsoidal mesafe, başlangıç/varış azimutu
   ve çok parçalı çizgi uzunluğu
 - WGS 84 formatları: DD, DMS, DDM, MGRS, UTM/UPS, GARS ve GEOREF
@@ -23,7 +23,7 @@ uyarlaması aynı kimlikleri ve ortak referans vektörlerini kullanır.
 
 `units` ve `geodesy` birbirinden ayrıdır:
 
-- `convertUnits(...)`, zaten bilinen bir fiziksel değerin birimini değiştirir.
+- `convertLength(...)`, zaten bilinen bir uzunluğun birimini değiştirir.
   Örneğin `1 NM → 1852 m`.
 - `inverseGeodesic(...)`, iki koordinattan WGS 84 yüzey mesafesini üretir.
 - `measureGeodesicPolyline(...)`, harita çizgisinin her segmentini geodezik
@@ -43,9 +43,9 @@ packages/
     src/
       exact/                  BigInt tabanlı kesin rasyonel matematik
       units/
-        catalog/              Her fiziksel büyüklük ayrı dosyada
-        converter.js          Birim dönüşüm servisi
-        registry.js           Birim kataloğu
+        catalog/length.js     Tek uzunluk kataloğu
+        converter.js          Kesin uzunluk dönüşüm servisi
+        registry.js           Uzunluk birimi kayıtları
       geodesy/
         core/                 WGS 84 ve sayısal doğrulama
         formats/              DMS / DDM
@@ -57,6 +57,7 @@ packages/
   core-java/
     src/main/java/.../
       units/                  Java exact birim motoru
+      coordinates/            Java format, grid, UTM/UPS ve CRS motoru
       geodesy/                Java WGS 84 ölçüm motoru
 
 contracts/test-vectors/       JS ve Java için ortak doğruluk vektörleri
@@ -68,20 +69,39 @@ React kodu hesap formülü içermez. HTTP katmanı da yalnızca public core API'
 
 ## JavaScript kullanımı
 
-### Birim dönüşümü
+### Kesin uzunluk dönüşümü
 
 ```js
-import { convertUnits } from "@convert-tools/core/units";
+import { convertLength } from "@convert-tools/core/length";
 
-const result = convertUnits(
+const result = convertLength(
   "1",
-  "length",
   "nautical-mile",
   "metre",
 );
 
 console.log(result.value); // "1852"
+console.log(result.exactValue);
+// { numerator: "1852", denominator: "1" }
 ```
+
+Ondalık gösterimi sonsuz süren dönüşümlerde `value` alanı yalnız sunum
+değeridir. Sonraki hesaplamaya `exactValue` verildiğinde yuvarlama zincire
+girmez:
+
+```js
+const nauticalMiles = convertLength("1", "metre", "nautical-mile");
+const metres = convertLength(
+  nauticalMiles.exactValue,
+  "nautical-mile",
+  "metre",
+);
+
+console.log(metres.value); // "1"
+```
+
+`@convert-tools/core/units` yolu geriye dönük geçiş kolaylığı için aynı
+uzunluk API'sini sunar. Başka fiziksel büyüklük katalogları bulunmaz.
 
 ### İki harita noktası arasındaki mesafe
 
@@ -113,7 +133,7 @@ const measurement = measureGeodesicPolyline(points);
 console.log(measurement.distanceMetres);
 ```
 
-Metre sonucunu NM, km veya mile çevirmek için ayrıca `convertUnits` çağrılır.
+Metre sonucunu NM, km veya mile çevirmek için ayrıca `convertLength` çağrılır.
 Hesaplanan `number` sonucu hesap katmanında yuvarlanmaz; yuvarlama yalnız
 sunumda yapılır.
 
@@ -127,15 +147,38 @@ GeodesicResult result = Geodesic.inverse(ankara, istanbul);
 System.out.println(result.distanceMetres());
 ```
 
-Java birim motoru aynı kategori/birim kimliklerini kullanır:
+Java uzunluk motoru aynı birim kimliklerini ve kesin kesir sözleşmesini
+kullanır:
 
 ```java
-UnitConversion result = UnitConverter.convert(
+UnitConversion first = LengthConverter.convert(
     "1",
-    "length",
     "nautical-mile",
     "metre",
     24
+);
+
+UnitConversion back = LengthConverter.convert(
+    first.exactValue(),
+    "metre",
+    "nautical-mile",
+    24
+);
+```
+
+Koordinat formatları ve CRS dönüşümleri de Java çekirdeğinde aynı WGS 84
+sözleşmesiyle bulunur:
+
+```java
+CoordinateSource source = Coordinates.fromMgrs("38SLC3918701405");
+CoordinateResult formats = Coordinates.results(source, 5);
+GeoPoint mapPoint = Coordinates.toGeoPoint(source);
+
+CrsTransformation projected = CrsTransformer.transform(
+    "EPSG:4326",
+    "EPSG:32636",
+    "32.859742",
+    "39.933365"
 );
 ```
 
@@ -176,9 +219,11 @@ pnpm typecheck
 
 ## Doğruluk modeli
 
-Fiziksel birim oranları JavaScript'te `BigInt`, Java'da `BigInteger` pay/payda
-olarak tutulur. Deniz mili tam `1852 m`, uluslararası ayak tam `0.3048 m`
-kabul edilir. NATO 6400 mil ile 6000'lik mil ayrı birimlerdir.
+Uzunluk oranları JavaScript'te `BigInt`, Java'da `BigInteger` pay/payda olarak
+tutulur. Deniz mili tam `1852 m`, uluslararası ayak tam `0.3048 m` kabul
+edilir. Her sonuç, gösterilen ondalık metnin yanında JSON'a uygun kesin
+`numerator`/`denominator` değerini taşır. Bütün birim çiftlerinde kesin değer
+üzerinden ileri–geri dönüş kimliği korunur.
 
 Harita ölçümü WGS 84 dönel elipsoidi üzerinde inverse/direct geodezik çözer.
 Normal çiftlerde hızlı iteratif inverse çözüm, antipodale yakın çiftlerde
@@ -197,3 +242,8 @@ Bu değer elipsoit yüzey mesafesidir. Şunlarla aynı değildir:
 Sayısal doğruluk, kaynak koordinatın veya sensörün gerçek dünya doğruluğunu
 artırmaz. Operasyonel kullanımda datum, yükseklik modeli, cihaz hatası ve
 yetkili referans yazılımıyla bağımsız kabul testi ayrıca yapılmalıdır.
+
+DD, DMS, DDM ve projeksiyon dönüşümleri kendi ilan edilen sayısal toleransıyla
+test edilir. MGRS, GARS ve GEOREF bir noktayı değil çözünürlüğü belirli bir
+hücreyi temsil eder; bu formatlarda doğru sözleşme özgün noktanın bit düzeyinde
+geri gelmesi değil, noktanın ilgili hücrenin sınırları içinde kalmasıdır.

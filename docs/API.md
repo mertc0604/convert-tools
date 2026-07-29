@@ -6,20 +6,66 @@ Yerel adres: `http://127.0.0.1:5173/api/convert`
 - `POST`: dönüşüm veya geodezik ölçüm
 - `OPTIONS`: CORS ön kontrolü
 - Hatalı girdi: `400` ve `{ "error": "..." }`
-- Contract sürümü: `1.1`
+- Contract sürümü: `2.0`
+- En büyük istek gövdesi: `131072` bayt
+- Bir kesin sayı bileşeninde en fazla `4096` onluk basamak
 
-## Birim dönüşümü
+## Kesin uzunluk dönüşümü
 
 ```json
 {
-  "type": "unit",
-  "category": "speed",
+  "type": "length",
   "value": "1",
-  "from": "knot",
-  "to": "metre-second",
+  "from": "nautical-mile",
+  "to": "metre",
   "precision": 24
 }
 ```
+
+Ondalık değerler JSON sayı olarak değil metin olarak gönderilir. Yanıt hem
+gösterim değerini hem de zincirleme hesaplarda kullanılacak kesin kesri taşır:
+
+```json
+{
+  "type": "length",
+  "category": "length",
+  "result": {
+    "value": "1852",
+    "unit": "metre",
+    "symbol": "m",
+    "exactDecimal": true,
+    "rounded": false,
+    "precision": 24,
+    "roundingMode": "HALF_UP",
+    "exactValue": {
+      "numerator": "1852",
+      "denominator": "1"
+    },
+    "exactMetres": {
+      "numerator": "1852",
+      "denominator": "1"
+    }
+  }
+}
+```
+
+Örneğin `metre → deniz mili` sonucu sonsuz ondalıksa ikinci istekte
+yuvarlanmış `value` yerine ilk yanıtın `exactValue` alanı gönderilir:
+
+```json
+{
+  "type": "length",
+  "exactValue": {
+    "numerator": "1",
+    "denominator": "1852"
+  },
+  "from": "nautical-mile",
+  "to": "metre"
+}
+```
+
+Eski istemciler için `type: "unit"` yalnız `category: "length"` ile kabul
+edilir. Hız, alan, açı, kütle, basınç ve sıcaklık kategorileri bulunmaz.
 
 ## İki nokta arası WGS 84 mesafe
 
@@ -61,11 +107,28 @@ istenen gösterim birimini birlikte taşır:
       "distanceMetres": 350091.7044265541,
       "value": "189.034397638528",
       "unit": "nautical-mile",
-      "symbol": "NM"
+      "symbol": "NM",
+      "exactValue": {
+        "numerator": "3500917044265541",
+        "denominator": "18520000000000"
+      },
+      "exactMetres": {
+        "numerator": "3500917044265541",
+        "denominator": "10000000000"
+      },
+      "exactDecimal": false,
+      "rounded": true,
+      "precision": 12,
+      "roundingMode": "HALF_UP"
     }
   }
 }
 ```
+
+`distanceMetres` geodezik çözücünün sayısal sonucudur. `distance.exactMetres`
+bu sonucun API'ye aktarılan ondalık gösterimini kesin kesir olarak taşır;
+sonraki birim değişikliklerinde `distance.exactValue` kullanılarak ilave
+yuvarlama zincire sokulmaz.
 
 ## Harita çizgisi uzunluğu
 
@@ -121,6 +184,9 @@ DD:
 ```
 
 DMS ve DDM aynı `latitude` / `longitude` alanlarını kullanır.
+Üç bileşenli güney DMS değerinde `S` öncesinde saniye işareti (`"` veya `″`)
+bulunmalıdır; böylece `s` harfinin saniye mi güney yarımküre mi olduğu sessizce
+yanlış yorumlanmaz.
 
 MGRS, GARS ve GEOREF:
 
@@ -148,6 +214,11 @@ UTM/UPS:
 ```
 
 UPS için `zone` değeri `0` kullanılır.
+
+Yanıttaki `result.resolution` alanı her gösterimin çözünürlüğünü bildirir.
+DD/DMS/DDM ve UTM/UPS için yuvarlama adımı; MGRS, GARS ve GEOREF için hücre
+boyutu verilir. Hücre formatları özgün noktayı birebir geri üretmez; çözümleme
+hücrenin merkez noktasını döndürür.
 
 ## CRS / EPSG dönüşümü
 

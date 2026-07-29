@@ -4,11 +4,31 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.RoundingMode;
 import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public record Rational(BigInteger numerator, BigInteger denominator) {
+    private static final int MAX_DECIMAL_EXPONENT = 1000;
+    private static final int MAX_INPUT_DIGITS = 4096;
+    private static final int MAX_RATIONAL_DIGITS = 8192;
+    private static final Pattern DECIMAL_PATTERN = Pattern.compile(
+            "[+-]?(?:(?:\\d+(?:\\.\\d*)?)|(?:\\.\\d+))"
+                    + "(?:[eE]([+-]?\\d+))?"
+    );
+
     public Rational {
         Objects.requireNonNull(numerator, "numerator");
         Objects.requireNonNull(denominator, "denominator");
+        requireDigitLimit(
+                numerator,
+                MAX_RATIONAL_DIGITS,
+                "Rational numerator"
+        );
+        requireDigitLimit(
+                denominator,
+                MAX_RATIONAL_DIGITS,
+                "Rational denominator"
+        );
         if (denominator.signum() == 0) {
             throw new ArithmeticException("Division by zero is not allowed.");
         }
@@ -39,10 +59,51 @@ public record Rational(BigInteger numerator, BigInteger denominator) {
                 .trim()
                 .replaceAll("\\s+", "")
                 .replace(',', '.');
-        if (!normalized.matches(
-                "[+-]?(?:(?:\\d+(?:\\.\\d*)?)|(?:\\.\\d+))(?:[eE][+-]?\\d+)?"
-        )) {
+        Matcher matcher = DECIMAL_PATTERN.matcher(normalized);
+        if (!matcher.matches()) {
             throw new IllegalArgumentException("Enter a valid decimal number.");
+        }
+        int exponentIndex = Math.max(
+                normalized.indexOf('e'),
+                normalized.indexOf('E')
+        );
+        String significand = exponentIndex < 0
+                ? normalized
+                : normalized.substring(0, exponentIndex);
+        long digitCount = significand.chars()
+                .filter(Character::isDigit)
+                .count();
+        if (digitCount > MAX_INPUT_DIGITS) {
+            throw new IllegalArgumentException(
+                    "Decimal values must contain at most "
+                            + MAX_INPUT_DIGITS
+                            + " digits."
+            );
+        }
+        String exponentText = matcher.group(1);
+        if (exponentText != null) {
+            final int exponent;
+            try {
+                exponent = Integer.parseInt(exponentText);
+            } catch (NumberFormatException exception) {
+                throw new IllegalArgumentException(
+                        "Exponent must be between -"
+                                + MAX_DECIMAL_EXPONENT
+                                + " and "
+                                + MAX_DECIMAL_EXPONENT
+                                + ".",
+                        exception
+                );
+            }
+            if (Math.abs((long) exponent) > MAX_DECIMAL_EXPONENT) {
+                throw new IllegalArgumentException(
+                        "Exponent must be between -"
+                                + MAX_DECIMAL_EXPONENT
+                                + " and "
+                                + MAX_DECIMAL_EXPONENT
+                                + "."
+                );
+            }
         }
 
         BigDecimal decimal = new BigDecimal(normalized);
@@ -55,6 +116,19 @@ public record Rational(BigInteger numerator, BigInteger denominator) {
             );
         }
         return new Rational(numerator, BigInteger.TEN.pow(scale));
+    }
+
+    private static void requireDigitLimit(
+            BigInteger value,
+            int maximum,
+            String label
+    ) {
+        int digits = value.abs().toString().length();
+        if (digits > maximum) {
+            throw new IllegalArgumentException(
+                    label + " must contain at most " + maximum + " digits."
+            );
+        }
     }
 
     public Rational add(Rational other) {

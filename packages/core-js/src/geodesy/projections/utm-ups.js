@@ -12,6 +12,11 @@ import { normalizeLongitude, validatePoint } from "../core/numbers.js";
 const UTM_FALSE_EASTING = 500000;
 const UTM_FALSE_NORTHING = 10000000;
 const UPS_FALSE_ORIGIN = 2000000;
+const UTM_REFINEMENT_ITERATIONS = 3;
+const UTM_REFINEMENT_STEP_DEGREES = 1e-5;
+const UTM_REFINEMENT_MAX_CORRECTION_DEGREES = 1e-4;
+const UTM_REFINEMENT_MAX_INITIAL_RESIDUAL_METRES = 1;
+const UTM_REFINEMENT_TARGET_METRES = 1e-7;
 
 export function standardUtmZone(latitude, longitude) {
   if (latitude < -80 || latitude >= 84) return 0;
@@ -36,9 +41,17 @@ export function centralMeridian(zone) {
   return zone * 6 - 183;
 }
 
-export function utmForward(latitude, longitude, requestedZone) {
+function calculateUtmForward(
+  latitude,
+  longitude,
+  requestedZone,
+  zoneToleranceDegrees,
+) {
   validatePoint(latitude, longitude);
-  if (latitude < -80 || latitude > 84) {
+  if (
+    latitude < -80 - zoneToleranceDegrees ||
+    latitude > 84 + zoneToleranceDegrees
+  ) {
     throw new Error("UTM is defined between 80°S and 84°N.");
   }
 
@@ -54,7 +67,7 @@ export function utmForward(latitude, longitude, requestedZone) {
   const longitudeArcDegrees = normalizeLongitude(
     normalizedLongitude - centralMeridian(zone),
   );
-  if (Math.abs(longitudeArcDegrees) > 6) {
+  if (Math.abs(longitudeArcDegrees) > 6 + zoneToleranceDegrees) {
     throw new Error("Longitude is too far from the selected UTM zone.");
   }
   const sinLatitude = Math.sin(latitudeRadians);
@@ -90,6 +103,166 @@ export function utmForward(latitude, longitude, requestedZone) {
   if (!north) northing += UTM_FALSE_NORTHING;
 
   return { zone, north, easting, northing };
+}
+
+export function utmForward(latitude, longitude, requestedZone) {
+  return calculateUtmForward(latitude, longitude, requestedZone, 0);
+}
+
+function projectForHemisphere(latitude, longitude, zone, north) {
+  try {
+    const projected = calculateUtmForward(
+      latitude,
+      longitude,
+      zone,
+      UTM_REFINEMENT_MAX_CORRECTION_DEGREES,
+    );
+    const signedNorthing = projected.north
+      ? projected.northing
+      : projected.northing - UTM_FALSE_NORTHING;
+    return {
+      easting: projected.easting,
+      northing: signedNorthing + (north ? 0 : UTM_FALSE_NORTHING),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function refineUtmInverse(
+  zone,
+  north,
+  easting,
+  northing,
+  initialPoint,
+) {
+  let point = initialPoint;
+  let projected = projectForHemisphere(
+    point.latitude,
+    point.longitude,
+    zone,
+    north,
+  );
+  if (!projected) return point;
+
+  let eastingResidual = easting - projected.easting;
+  let northingResidual = northing - projected.northing;
+  let residualSquared =
+    eastingResidual * eastingResidual +
+    northingResidual * northingResidual;
+  if (
+    residualSquared >
+    UTM_REFINEMENT_MAX_INITIAL_RESIDUAL_METRES ** 2
+  ) {
+    return point;
+  }
+
+  for (
+    let iteration = 0;
+    iteration < UTM_REFINEMENT_ITERATIONS &&
+    residualSquared > UTM_REFINEMENT_TARGET_METRES ** 2;
+    iteration += 1
+  ) {
+    const latitudeStep =
+      point.latitude + UTM_REFINEMENT_STEP_DEGREES <= 84
+        ? UTM_REFINEMENT_STEP_DEGREES
+        : -UTM_REFINEMENT_STEP_DEGREES;
+    const longitudeCandidate = normalizeLongitude(
+      point.longitude + UTM_REFINEMENT_STEP_DEGREES,
+    );
+    const longitudeStep = normalizeLongitude(
+      longitudeCandidate - point.longitude,
+    );
+    const latitudeProjection = projectForHemisphere(
+      point.latitude + latitudeStep,
+      point.longitude,
+      zone,
+      north,
+    );
+    const longitudeProjection = projectForHemisphere(
+      point.latitude,
+      longitudeCandidate,
+      zone,
+      north,
+    );
+    if (!latitudeProjection || !longitudeProjection || longitudeStep === 0) {
+      break;
+    }
+
+    const eastingByLatitude =
+      (latitudeProjection.easting - projected.easting) / latitudeStep;
+    const northingByLatitude =
+      (latitudeProjection.northing - projected.northing) / latitudeStep;
+    const eastingByLongitude =
+      (longitudeProjection.easting - projected.easting) / longitudeStep;
+    const northingByLongitude =
+      (longitudeProjection.northing - projected.northing) / longitudeStep;
+    const determinant =
+      eastingByLatitude * northingByLongitude -
+      eastingByLongitude * northingByLatitude;
+    if (!Number.isFinite(determinant) || Math.abs(determinant) < 1) {
+      break;
+    }
+
+    let latitudeCorrection =
+      (eastingResidual * northingByLongitude -
+        eastingByLongitude * northingResidual) /
+      determinant;
+    let longitudeCorrection =
+      (eastingByLatitude * northingResidual -
+        eastingResidual * northingByLatitude) /
+      determinant;
+    if (
+      !Number.isFinite(latitudeCorrection) ||
+      !Number.isFinite(longitudeCorrection)
+    ) {
+      break;
+    }
+
+    const correctionScale = Math.min(
+      1,
+      UTM_REFINEMENT_MAX_CORRECTION_DEGREES /
+        Math.max(
+          Math.abs(latitudeCorrection),
+          Math.abs(longitudeCorrection),
+        ),
+    );
+    latitudeCorrection *= correctionScale;
+    longitudeCorrection *= correctionScale;
+    const candidate = {
+      latitude: point.latitude + latitudeCorrection,
+      longitude: normalizeLongitude(
+        point.longitude + longitudeCorrection,
+      ),
+    };
+    if (candidate.latitude < -80 || candidate.latitude > 84) {
+      break;
+    }
+
+    const candidateProjection = projectForHemisphere(
+      candidate.latitude,
+      candidate.longitude,
+      zone,
+      north,
+    );
+    if (!candidateProjection) break;
+    const candidateEastingResidual =
+      easting - candidateProjection.easting;
+    const candidateNorthingResidual =
+      northing - candidateProjection.northing;
+    const candidateResidualSquared =
+      candidateEastingResidual * candidateEastingResidual +
+      candidateNorthingResidual * candidateNorthingResidual;
+    if (candidateResidualSquared >= residualSquared) break;
+
+    point = candidate;
+    projected = candidateProjection;
+    eastingResidual = candidateEastingResidual;
+    northingResidual = candidateNorthingResidual;
+    residualSquared = candidateResidualSquared;
+  }
+
+  return validatePoint(point.latitude, point.longitude);
 }
 
 export function utmInverse(zone, north, easting, northing) {
@@ -173,7 +346,13 @@ export function utmInverse(zone, north, easting, northing) {
       cosFootprint) *
       RADIAN;
 
-  return validatePoint(latitude, normalizeLongitude(longitude));
+  return refineUtmInverse(
+    zone,
+    north,
+    easting,
+    northing,
+    validatePoint(latitude, normalizeLongitude(longitude)),
+  );
 }
 
 function polarConstant() {

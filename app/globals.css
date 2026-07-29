@@ -132,43 +132,12 @@ a:focus-visible {
   font-size: 14px;
 }
 
-.category-tabs {
-  display: flex;
-  gap: 6px;
-  margin: 28px 0;
-  overflow-x: auto;
-  padding-bottom: 3px;
-  scrollbar-width: thin;
-}
-
-.category-tabs button {
-  flex: 0 0 auto;
-  height: 38px;
-  padding: 0 14px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--surface);
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 650;
-}
-
-.category-tabs button:hover {
-  border-color: var(--border-strong);
-  color: var(--text);
-}
-
-.category-tabs button.active {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: white;
-}
-
 .conversion-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 44px minmax(0, 1fr);
   gap: 16px;
   align-items: center;
+  margin-top: 28px;
 }
 
 .conversion-side {
@@ -260,6 +229,11 @@ a:focus-visible {
   color: white;
 }
 
+.swap-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .result-value {
   min-height: 75px;
   display: grid;
@@ -336,6 +310,13 @@ a:focus-visible {
   overflow-wrap: anywhere;
   font-family: var(--mono);
   text-align: right;
+}
+
+.swap-precision-note {
+  margin: 9px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
 }
 
 .examples-section {
@@ -616,8 +597,13 @@ footer {
   display: block;
   margin-top: 9px;
   color: #8b6427;
-  font-size: 9px;
+  font-size: 11px;
   line-height: 1.4;
+}
+
+.coordinate-result small.coordinate-resolution {
+  margin-top: 6px;
+  color: var(--muted);
 }
 
 .area-result {
@@ -673,8 +659,31 @@ footer {
   margin-top: 16px;
 }
 
-.crs-form > .primary-button {
+.crs-actions {
+  display: flex;
+  gap: 9px;
   margin-top: 16px;
+}
+
+.secondary-button {
+  min-height: 42px;
+  padding: 0 15px;
+  border: 1px solid var(--border-strong);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.secondary-button:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.secondary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .distance-results {

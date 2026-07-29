@@ -1,9 +1,5 @@
-id,category,value,fromUnit,toUnit,precision,expected
-nautical-mile-to-metre,length,1,nautical-mile,metre,24,1852
-foot-to-metre,length,1,foot,metre,24,0.3048
-knot-to-metre-second,speed,1,knot,metre-second,24,0.514444444444444444444444
-nato-mil-to-degree,angle,1600,nato-mil,degree,24,90
-acre-to-square-metre,area,1,acre,square-metre,24,4046.8564224
-pound-to-kilogram,mass,1,pound,kilogram,24,0.45359237
-bar-to-kilopascal,pressure,1,bar,kilopascal,24,100
-fahrenheit-to-celsius,temperature,32,fahrenheit,celsius,24,0
+id,category,value,fromUnit,toUnit,precision,expected,expectedNumerator,expectedDenominator,expectedMetresNumerator,expectedMetresDenominator,expectedFactorNumerator,expectedFactorDenominator
+nautical-mile-to-metre,length,1,nautical-mile,metre,24,1852,1852,1,1852,1,1852,1
+metre-to-nautical-mile,length,1,metre,nautical-mile,24,0.000539956803455723542117,1,1852,1,1,1,1852
+metre-roundtrip-to-nautical-mile,length,1852,metre,nautical-mile,24,1,1,1,1852,1,1,1852
+foot-to-metre,length,1,foot,metre,24,0.3048,381,1250,381,1250,381,1250

@@ -1,15 +1,15 @@
 # Convert Tools Core — Java
 
-Java 17 için dış bağımlılığı olmayan birim dönüşümü ve WGS 84 geodezi
-çekirdeğidir. JavaScript çekirdeğiyle aynı birim kimliklerini, metre/derece
-sözleşmesini ve `contracts/test-vectors` referanslarını kullanır.
+Java 17 için dış bağımlılığı olmayan kesin uzunluk dönüşümü, koordinat
+formatları, CRS dönüşümü ve WGS 84 geodezi çekirdeğidir. JavaScript
+çekirdeğiyle aynı birim kimliklerini, metre/derece sözleşmesini ve
+`contracts/test-vectors` referanslarını kullanır.
 
-## Birim dönüşümü
+## Kesin uzunluk dönüşümü
 
 ```java
-UnitConversion result = UnitConverter.convert(
+UnitConversion result = LengthConverter.convert(
     "1",
-    "length",
     "nautical-mile",
     "metre",
     24
@@ -17,6 +17,80 @@ UnitConversion result = UnitConverter.convert(
 
 System.out.println(result.value()); // 1852
 ```
+
+Ondalık gösterimi sonsuz süren bir sonuç yeniden dönüştürülecekse gösterilen
+metin yerine kesin değer taşınır:
+
+```java
+UnitConversion first = LengthConverter.convert(
+    "1", "metre", "nautical-mile", 24
+);
+UnitConversion back = LengthConverter.convert(
+    first.exactValue(), "nautical-mile", "metre", 24
+);
+
+System.out.println(back.value()); // 1
+```
+
+## Koordinat formatları
+
+```java
+CoordinateSource source = Coordinates.fromDms(
+    "39°56'00.114\"N",
+    "032°51'35.0712\"E"
+);
+CoordinateResult result = Coordinates.results(source, 5);
+
+System.out.println(result.mgrs());
+System.out.println(result.utmUps());
+System.out.println(result.resolution().get(CoordinateFormat.MGRS));
+```
+
+Girdi için `fromDecimalDegrees`, `fromDms`, `fromDdm`, `fromMgrs`,
+`fromUtmUps`, `fromGars` ve `fromGeoref` kullanılabilir. MGRS, GARS ve GEOREF
+bir nokta yerine hücre tanımlar; çözümleme hücre merkezini ve hücre
+çözünürlüğünü birlikte döndürür.
+
+Üç bileşenli güney DMS yazımında `S` öncesinde `"` veya `″` saniye işareti
+zorunludur. Belirsiz `39d56m00.114s` girdisi sessiz yön değişimi yerine
+reddedilir.
+
+Koordinat sonucunu harita mesafesi motoruna açıkça aktarmak için adaptör
+kullanılır:
+
+```java
+CoordinateSource first = Coordinates.fromMgrs("36SVK8801520370");
+CoordinateSource second = Coordinates.fromMgrs("38SLC3918701405");
+GeodesicResult distance = Geodesic.inverse(
+    Coordinates.toGeoPoint(first),
+    Coordinates.toGeoPoint(second)
+);
+```
+
+Hücre tabanlı kaynaklarda ölçüm, format sözleşmesi gereği hücre merkezleri
+arasında yapılır.
+
+## CRS / EPSG dönüşümü
+
+```java
+CrsTransformation projected = CrsTransformer.transform(
+    "EPSG:4326",
+    "EPSG:32636",
+    "32.859742",
+    "39.933365"
+);
+
+CrsTransformation restored = CrsTransformer.transform(
+    projected.target(),
+    projected.source(),
+    projected.x(),
+    projected.y()
+);
+```
+
+Desteklenen sistemler EPSG:4326, EPSG:3857, WGS 84 UTM kuzey/güney zonları ve
+WGS 84 UPS kuzey/güneydir. API sırası her zaman X/Y'dir; EPSG:4326 için X
+boylam, Y enlemdir.
 
 ## İki harita noktası arasındaki mesafe
 

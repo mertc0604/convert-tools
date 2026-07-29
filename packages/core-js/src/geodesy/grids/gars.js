@@ -4,18 +4,25 @@ const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ";
 
 export function encodeGars(longitudeValue, latitudeValue) {
   const { latitude, longitude } = pointFromValues(latitudeValue, longitudeValue);
-  const safeLongitude = longitude === 180 ? 180 - Number.EPSILON * 128 : longitude;
-  const safeLatitude = latitude === 90 ? 90 - Number.EPSILON * 64 : latitude;
-  const longitudePosition = (safeLongitude + 180) / 0.5;
-  const latitudePosition = (safeLatitude + 90) / 0.5;
-  const longitudeIndex = Math.floor(longitudePosition);
-  const latitudeIndex = Math.floor(latitudePosition);
+  const longitudePosition = (longitude + 180) / 0.5;
+  const latitudePosition = (latitude + 90) / 0.5;
+  const longitudeIndex = Math.min(719, Math.floor(longitudePosition));
+  const latitudeIndex = Math.min(359, Math.floor(latitudePosition));
   const longitudeBand = String(longitudeIndex + 1).padStart(3, "0");
   const latitudeBand =
     ALPHABET[Math.floor(latitudeIndex / 24)] + ALPHABET[latitudeIndex % 24];
 
-  const longitudeRemainder = longitudePosition - longitudeIndex;
-  const latitudeRemainder = latitudePosition - latitudeIndex;
+  // +180° and +90° are closed outer boundaries of the final cells. Keeping a
+  // remainder of one places them in those cells without relying on an epsilon
+  // that can round back to the invalid 721st/361st band.
+  const longitudeRemainder = Math.min(
+    1,
+    Math.max(0, longitudePosition - longitudeIndex),
+  );
+  const latitudeRemainder = Math.min(
+    1,
+    Math.max(0, latitudePosition - latitudeIndex),
+  );
   const quadrantColumn = Math.min(1, Math.floor(longitudeRemainder * 2));
   const quadrantRow = Math.min(1, Math.floor(latitudeRemainder * 2));
   const quadrant =

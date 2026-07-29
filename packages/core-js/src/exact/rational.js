@@ -1,6 +1,10 @@
 const TEN = 10n;
 const MAX_DECIMAL_EXPONENT = 1000;
 const MAX_OUTPUT_DIGITS = 60;
+const MAX_INPUT_DIGITS = 4096;
+const MAX_RATIONAL_DIGITS = 8192;
+const INTEGER_PATTERN = /^[+-]?\d+$/;
+const NORMALIZED_RATIONALS = new WeakSet();
 
 function absolute(value) {
   return value < 0n ? -value : value;
@@ -19,10 +23,19 @@ function greatestCommonDivisor(left, right) {
   return a;
 }
 
+function assertBigIntDigits(value, maximum, label) {
+  const digitCount = absolute(value).toString().length;
+  if (digitCount > maximum) {
+    throw new Error(`${label} must contain at most ${maximum} digits.`);
+  }
+}
+
 export function normalizeRational(numerator, denominator = 1n) {
   if (denominator === 0n) {
     throw new Error("Division by zero is not allowed.");
   }
+  assertBigIntDigits(numerator, MAX_RATIONAL_DIGITS, "Rational numerator");
+  assertBigIntDigits(denominator, MAX_RATIONAL_DIGITS, "Rational denominator");
 
   let normalizedNumerator = numerator;
   let normalizedDenominator = denominator;
@@ -32,27 +45,31 @@ export function normalizeRational(numerator, denominator = 1n) {
   }
 
   if (normalizedNumerator === 0n) {
-    return Object.freeze({ n: 0n, d: 1n });
+    const zero = Object.freeze({ n: 0n, d: 1n });
+    NORMALIZED_RATIONALS.add(zero);
+    return zero;
   }
 
   const divisor = greatestCommonDivisor(
     normalizedNumerator,
     normalizedDenominator,
   );
-  return Object.freeze({
+  const rational = Object.freeze({
     n: normalizedNumerator / divisor,
     d: normalizedDenominator / divisor,
   });
+  NORMALIZED_RATIONALS.add(rational);
+  return rational;
 }
 
-function powerOfTen(exponent) {
+function powerOfTen(exponent, maximum = MAX_RATIONAL_DIGITS) {
   if (
     !Number.isInteger(exponent) ||
     exponent < 0 ||
-    exponent > MAX_DECIMAL_EXPONENT
+    exponent > maximum
   ) {
     throw new Error(
-      `Decimal exponent must be between 0 and ${MAX_DECIMAL_EXPONENT}.`,
+      `Power-of-ten exponent must be between 0 and ${maximum}.`,
     );
   }
 
@@ -60,7 +77,25 @@ function powerOfTen(exponent) {
 }
 
 export function parseDecimal(input) {
+  if (typeof input === "number" && !Number.isSafeInteger(input)) {
+    throw new Error(
+      "Number inputs must be safe integers. Use a decimal string for non-integer or high-precision values.",
+    );
+  }
+  if (
+    typeof input !== "string" &&
+    typeof input !== "bigint" &&
+    typeof input !== "number"
+  ) {
+    throw new Error("Decimal values must be provided as strings or safe integers.");
+  }
+
   const source = String(input).trim().replace(/\s+/g, "");
+  if (source.length > MAX_INPUT_DIGITS + 16) {
+    throw new Error(
+      `Decimal values must contain at most ${MAX_INPUT_DIGITS} digits.`,
+    );
+  }
   const match = source.match(
     /^([+-]?)(?:(\d+)(?:[.,](\d*))?|[.,](\d+))(?:[eE]([+-]?\d+))?$/,
   );
@@ -70,7 +105,7 @@ export function parseDecimal(input) {
   }
 
   const sign = match[1] === "-" ? -1n : 1n;
-  const integerPart = match[2] ?? "0";
+  const sourceIntegerPart = match[2] ?? "";
   const fractionPart = match[3] ?? match[4] ?? "";
   const exponent = Number(match[5] ?? "0");
 
@@ -83,7 +118,13 @@ export function parseDecimal(input) {
     );
   }
 
-  const digits = `${integerPart}${fractionPart}`.replace(/^0+(?=\d)/, "");
+  const rawDigits = `${sourceIntegerPart}${fractionPart}`;
+  if (rawDigits.length > MAX_INPUT_DIGITS) {
+    throw new Error(
+      `Decimal values must contain at most ${MAX_INPUT_DIGITS} digits.`,
+    );
+  }
+  const digits = rawDigits.replace(/^0+(?=\d)/, "");
   let numerator = sign * BigInt(digits || "0");
   let denominator = powerOfTen(fractionPart.length);
 
@@ -96,18 +137,95 @@ export function parseDecimal(input) {
   return normalizeRational(numerator, denominator);
 }
 
+function integerComponent(value) {
+  let result;
+  if (typeof value === "bigint") {
+    result = value;
+  } else if (typeof value === "number") {
+    if (!Number.isSafeInteger(value)) {
+      throw new Error(
+        "Rational number components must be safe integers. Use integer strings for high-precision values.",
+      );
+    }
+    result = BigInt(value);
+  } else if (typeof value === "string") {
+    const source = value.trim();
+    const digitCount = source[0] === "+" || source[0] === "-"
+      ? source.length - 1
+      : source.length;
+    if (digitCount > MAX_INPUT_DIGITS) {
+      throw new Error(
+        `Rational components must contain at most ${MAX_INPUT_DIGITS} digits.`,
+      );
+    }
+    if (!INTEGER_PATTERN.test(source)) {
+      throw new Error(
+        "Rational components must be integer strings or BigInts.",
+      );
+    }
+    result = BigInt(source);
+  } else {
+    throw new Error("Rational components must be integer strings or BigInts.");
+  }
+
+  assertBigIntDigits(result, MAX_INPUT_DIGITS, "Rational components");
+  return result;
+}
+
 export function toRational(value) {
+  if (
+    value &&
+    typeof value === "object" &&
+    NORMALIZED_RATIONALS.has(value)
+  ) {
+    return value;
+  }
   if (typeof value === "string") {
     return parseDecimal(value);
   }
   if (Array.isArray(value) && value.length === 2) {
-    return normalizeRational(BigInt(value[0]), BigInt(value[1]));
+    return normalizeRational(
+      integerComponent(value[0]),
+      integerComponent(value[1]),
+    );
   }
-  if (typeof value === "bigint" || Number.isSafeInteger(value)) {
+  if (typeof value === "bigint") {
     return normalizeRational(BigInt(value), 1n);
   }
+  if (typeof value === "number") {
+    if (!Number.isSafeInteger(value)) {
+      throw new Error(
+        "Number inputs must be safe integers. Use a decimal string for non-integer or high-precision values.",
+      );
+    }
+    return normalizeRational(BigInt(value), 1n);
+  }
+  if (value && typeof value === "object") {
+    if ("n" in value && "d" in value) {
+      return normalizeRational(
+        integerComponent(value.n),
+        integerComponent(value.d),
+      );
+    }
+    if ("numerator" in value && "denominator" in value) {
+      return normalizeRational(
+        integerComponent(value.numerator),
+        integerComponent(value.denominator),
+      );
+    }
+  }
 
-  throw new Error("Rational values must be decimal strings or [n, d] pairs.");
+  throw new Error(
+    "Rational values must be decimal strings, safe integers, Rational objects, JSON rational objects, or [n, d] pairs.",
+  );
+}
+
+export function rationalToJson(value) {
+  const rational = toRational(value);
+  return Object.freeze({
+    numerator: rational.n.toString(),
+    denominator: rational.d.toString(),
+  });
 }
 
 export function addRational(left, right) {
@@ -155,18 +273,23 @@ export function hasTerminatingDecimal(value) {
 }
 
 export function formatRational(value, maximumFractionDigits = 24) {
-  if (!Number.isInteger(maximumFractionDigits)) {
-    throw new Error("Maximum fraction digits must be an integer.");
+  if (
+    !Number.isInteger(maximumFractionDigits) ||
+    maximumFractionDigits < 0 ||
+    maximumFractionDigits > MAX_OUTPUT_DIGITS
+  ) {
+    throw new Error(
+      `Maximum fraction digits must be an integer between 0 and ${MAX_OUTPUT_DIGITS}.`,
+    );
   }
 
-  const digits = Math.max(
-    0,
-    Math.min(MAX_OUTPUT_DIGITS, maximumFractionDigits),
-  );
-  const negative = value.n < 0n;
-  const numerator = absolute(value.n);
+  const rational = toRational(value);
+  const digits = maximumFractionDigits;
+  const negative = rational.n < 0n;
+  const numerator = absolute(rational.n);
   const scale = powerOfTen(digits);
-  const rounded = (numerator * scale * 2n + value.d) / (value.d * 2n);
+  const rounded =
+    (numerator * scale * 2n + rational.d) / (rational.d * 2n);
   let output = rounded.toString().padStart(digits + 1, "0");
 
   if (digits > 0) {

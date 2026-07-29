@@ -1,22 +1,6 @@
-import {
-  ANGLE,
-  AREA,
-  LENGTH,
-  MASS,
-  PRESSURE,
-  SPEED,
-  TEMPERATURE,
-} from "./catalog/index.js";
+import { LENGTH } from "./catalog/index.js";
 
-export const UNIT_CATEGORIES = Object.freeze([
-  LENGTH,
-  SPEED,
-  AREA,
-  ANGLE,
-  MASS,
-  PRESSURE,
-  TEMPERATURE,
-]);
+export const UNIT_CATEGORIES = Object.freeze([LENGTH]);
 
 const CATEGORIES_BY_ID = new Map(
   UNIT_CATEGORIES.map((category) => [category.id, category]),

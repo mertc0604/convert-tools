@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { inverseGeodesic } from "@convert-tools/core/geodesy";
-import { convertUnits } from "@convert-tools/core/units";
+import { convertLength } from "@convert-tools/core/length";
 import { COPY } from "../config";
 import TextField from "../common/TextField";
 
@@ -31,9 +31,8 @@ const EXAMPLES = [
 ];
 
 function convertedDistance(distanceMetres, unit, precision) {
-  return convertUnits(
+  return convertLength(
     String(distanceMetres),
-    "length",
     "metre",
     unit,
     precision,
@@ -72,6 +71,7 @@ export default function DistanceCalculator({ language }) {
 
   function setValue(key, value) {
     setValues((current) => ({ ...current, [key]: value }));
+    setResult(null);
     setError("");
   }
 
@@ -81,6 +81,7 @@ export default function DistanceCalculator({ language }) {
       setResult(calculate(values));
       setError("");
     } catch {
+      setResult(null);
       setError(text.distanceInvalid);
     }
   }

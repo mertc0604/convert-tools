@@ -1,27 +1,21 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { convertLength, getCategory } from "@convert-tools/core/length";
 import {
-  UNIT_CATEGORIES,
-  convertUnits,
-  getCategory,
-} from "@convert-tools/core/units";
-import {
-  CATEGORY_LABELS,
   COPY,
-  UNIT_EXAMPLES,
-  UNIT_LABELS,
+  LENGTH_EXAMPLES,
+  LENGTH_UNIT_LABELS,
 } from "../config";
 import { copyText } from "../common/clipboard";
 
-function unitLabel(unit, language) {
-  return language === "en" ? UNIT_LABELS.en[unit.id] ?? unit.label : unit.label;
-}
+const LENGTH_CATEGORY_ID = "length";
+const LENGTH_CATEGORY = getCategory(LENGTH_CATEGORY_ID);
 
-function categoryLabel(category, language) {
+function unitLabel(unit, language) {
   return language === "en"
-    ? CATEGORY_LABELS.en[category.id] ?? category.label
-    : category.label;
+    ? LENGTH_UNIT_LABELS.en[unit.id] ?? unit.label
+    : unit.label;
 }
 
 function UnitSelect({ id, label, value, units, language, onChange }) {
@@ -45,48 +39,50 @@ function UnitSelect({ id, label, value, units, language, onChange }) {
 
 export default function UnitConverter({ language }) {
   const text = COPY[language];
-  const initialCategory = getCategory("length");
-  const [categoryId, setCategoryId] = useState("length");
-  const [fromId, setFromId] = useState(initialCategory.defaultFrom);
-  const [toId, setToId] = useState(initialCategory.defaultTo);
+  const [fromId, setFromId] = useState(LENGTH_CATEGORY.defaultFrom);
+  const [toId, setToId] = useState(LENGTH_CATEGORY.defaultTo);
   const [input, setInput] = useState("1");
+  const [exactInput, setExactInput] = useState(null);
   const [copied, setCopied] = useState(false);
-  const category = getCategory(categoryId);
-  const fromUnit = category.units.find((unit) => unit.id === fromId);
-  const toUnit = category.units.find((unit) => unit.id === toId);
+  const fromUnit = LENGTH_CATEGORY.units.find((unit) => unit.id === fromId);
+  const toUnit = LENGTH_CATEGORY.units.find((unit) => unit.id === toId);
 
   const conversion = useMemo(() => {
     try {
       return {
-        ...convertUnits(input, categoryId, fromId, toId, 24),
+        ...convertLength(
+          exactInput ?? input,
+          fromId,
+          toId,
+          24,
+        ),
         error: "",
       };
     } catch {
       return { error: text.invalid };
     }
-  }, [input, categoryId, fromId, toId, text.invalid]);
+  }, [input, exactInput, fromId, toId, text.invalid]);
 
   const examples = useMemo(
     () =>
-      UNIT_EXAMPLES[categoryId].map((example) => ({
+      LENGTH_EXAMPLES.map((example) => ({
         ...example,
-        output: convertUnits(
+        output: convertLength(
           example.value,
-          categoryId,
           example.from,
           example.to,
           10,
         ).value,
       })),
-    [categoryId],
+    [],
   );
 
-  function selectCategory(nextId) {
-    const next = getCategory(nextId);
-    setCategoryId(nextId);
-    setFromId(next.defaultFrom);
-    setToId(next.defaultTo);
-    setInput("1");
+  function swapUnits() {
+    if (conversion.error) return;
+    setInput(conversion.value);
+    setExactInput(conversion.exactValue ?? conversion.rational);
+    setFromId(toId);
+    setToId(fromId);
     setCopied(false);
   }
 
@@ -105,21 +101,6 @@ export default function UnitConverter({ language }) {
           <p>{text.unitSubtitle}</p>
         </div>
 
-        <div className="category-tabs" role="tablist" aria-label={text.unitTitle}>
-          {UNIT_CATEGORIES.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              role="tab"
-              aria-selected={categoryId === item.id}
-              className={categoryId === item.id ? "active" : ""}
-              onClick={() => selectCategory(item.id)}
-            >
-              {categoryLabel(item, language)}
-            </button>
-          ))}
-        </div>
-
         <div className="conversion-layout">
           <div className="conversion-side">
             <label className="value-label" htmlFor="conversion-value">
@@ -131,6 +112,7 @@ export default function UnitConverter({ language }) {
                 value={input}
                 onChange={(event) => {
                   setInput(event.target.value);
+                  setExactInput(null);
                   setCopied(false);
                 }}
                 inputMode="decimal"
@@ -143,20 +125,20 @@ export default function UnitConverter({ language }) {
               id="from-unit"
               label={text.from}
               value={fromId}
-              units={category.units}
+              units={LENGTH_CATEGORY.units}
               language={language}
-              onChange={setFromId}
+              onChange={(nextId) => {
+                setFromId(nextId);
+                setExactInput(null);
+              }}
             />
           </div>
 
           <button
             className="swap-button"
             type="button"
-            onClick={() => {
-              setFromId(toId);
-              setToId(fromId);
-              setCopied(false);
-            }}
+            onClick={swapUnits}
+            disabled={Boolean(conversion.error)}
             aria-label={text.swap}
             title={text.swap}
           >
@@ -182,7 +164,7 @@ export default function UnitConverter({ language }) {
               id="to-unit"
               label={text.to}
               value={toId}
-              units={category.units}
+              units={LENGTH_CATEGORY.units}
               language={language}
               onChange={setToId}
             />
@@ -198,6 +180,7 @@ export default function UnitConverter({ language }) {
             </code>
           </div>
         )}
+        <p className="swap-precision-note">{text.swapPrecision}</p>
       </section>
 
       <section className="examples-section" aria-labelledby="unit-examples">
@@ -207,10 +190,10 @@ export default function UnitConverter({ language }) {
         </div>
         <div className="example-grid">
           {examples.map((example) => {
-            const source = category.units.find(
+            const source = LENGTH_CATEGORY.units.find(
               (unit) => unit.id === example.from,
             );
-            const target = category.units.find(
+            const target = LENGTH_CATEGORY.units.find(
               (unit) => unit.id === example.to,
             );
             return (
@@ -219,6 +202,7 @@ export default function UnitConverter({ language }) {
                 type="button"
                 onClick={() => {
                   setInput(example.value);
+                  setExactInput(null);
                   setFromId(example.from);
                   setToId(example.to);
                   setCopied(false);

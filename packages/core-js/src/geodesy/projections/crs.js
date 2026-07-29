@@ -32,10 +32,14 @@ function toWgs84(definition, x, y) {
   const { number } = definition;
   if (number === 4326) return validatePoint(y, x);
   if (number === 3857) {
-    if (Math.abs(y) > Math.PI * WGS84.a) {
-      throw new Error("Y is outside the Web Mercator domain.");
+    const maximum = Math.PI * WGS84.a;
+    if (Math.abs(x) > maximum || Math.abs(y) > maximum) {
+      throw new Error("X or Y is outside the Web Mercator domain.");
     }
-    const longitude = (x / WGS84.a) * RADIAN;
+    const longitude = Math.max(
+      -180,
+      Math.min(180, (x / WGS84.a) * RADIAN),
+    );
     const latitude =
       (2 * Math.atan(Math.exp(y / WGS84.a)) - Math.PI / 2) * RADIAN;
     return validatePoint(latitude, longitude);
@@ -56,10 +60,13 @@ function fromWgs84(definition, point) {
     if (Math.abs(point.latitude) > WEB_MERCATOR_MAX_LATITUDE) {
       throw new Error("Latitude is outside the Web Mercator domain.");
     }
+    const maximum = Math.PI * WGS84.a;
+    const y =
+      WGS84.a *
+      Math.log(Math.tan(Math.PI / 4 + (point.latitude * DEGREE) / 2));
     return [
       WGS84.a * point.longitude * DEGREE,
-      WGS84.a *
-        Math.log(Math.tan(Math.PI / 4 + (point.latitude * DEGREE) / 2)),
+      Math.max(-maximum, Math.min(maximum, y)),
     ];
   }
   if (number >= 32601 && number <= 32660) {

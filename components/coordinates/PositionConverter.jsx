@@ -31,6 +31,34 @@ const INITIAL_VALUES = {
   georef: "QJCK51585600",
 };
 
+function compactResolution(value, maximumDigits = 12) {
+  return Number(value)
+    .toFixed(maximumDigits)
+    .replace(/(\.\d*?)0+$/, "$1")
+    .replace(/\.$/, "");
+}
+
+function resolutionLabel(key, resolution, text) {
+  if (!resolution) return "";
+  if (resolution.kind === "grid-cell") {
+    return `${compactResolution(resolution.cellMetres)} m ${text.resolutionCell}`;
+  }
+  if (resolution.kind === "angular-cell") {
+    return `${compactResolution(resolution.cellDegrees * 60)}′ ${text.resolutionCell}`;
+  }
+  if (resolution.kind === "grid-rounding") {
+    return `±${compactResolution(resolution.maximumErrorMetresPerAxis)} m ${text.resolutionMaximum}, ${text.resolutionPerAxis}`;
+  }
+  if (resolution.kind === "angular-rounding") {
+    const multiplier = key === "dms" ? 3600 : key === "ddm" ? 60 : 1;
+    const symbol = key === "dms" ? "″" : key === "ddm" ? "′" : "°";
+    return `±${compactResolution(
+      resolution.maximumErrorDegrees * multiplier,
+    )}${symbol} ${text.resolutionMaximum}`;
+  }
+  return "";
+}
+
 export default function PositionConverter({ language }) {
   const text = COPY[language];
   const [format, setFormat] = useState("dd");
@@ -41,10 +69,13 @@ export default function PositionConverter({ language }) {
   );
   const [error, setError] = useState("");
   const [copied, setCopied] = useState("");
+  const [isCurrent, setIsCurrent] = useState(true);
 
   function setValue(key, value) {
     setValues((current) => ({ ...current, [key]: value }));
     setError("");
+    setCopied("");
+    setIsCurrent(false);
   }
 
   function readPoint() {
@@ -70,8 +101,11 @@ export default function PositionConverter({ language }) {
       setResult(coordinateResults(readPoint(), Number(precision)));
       setError("");
       setCopied("");
+      setIsCurrent(true);
     } catch {
       setError(text.coordinateInvalid);
+      setCopied("");
+      setIsCurrent(false);
     }
   }
 
@@ -80,9 +114,12 @@ export default function PositionConverter({ language }) {
     setValues((current) => ({ ...current, ...nextValues }));
     setResult(coordinateResults(point, Number(precision)));
     setError("");
+    setCopied("");
+    setIsCurrent(true);
   }
 
   async function copyOutput(key, value) {
+    if (!isCurrent) return;
     await copyText(value);
     setCopied(key);
     window.setTimeout(() => setCopied(""), 1400);
@@ -111,6 +148,8 @@ export default function PositionConverter({ language }) {
               onChange={(event) => {
                 setFormat(event.target.value);
                 setError("");
+                setCopied("");
+                setIsCurrent(false);
               }}
             >
               {COORDINATE_FORMATS.map((item) => (
@@ -128,7 +167,10 @@ export default function PositionConverter({ language }) {
               onChange={(event) => {
                 const next = event.target.value;
                 setPrecision(next);
-                setResult(coordinateResults(result, Number(next)));
+                setCopied("");
+                if (isCurrent) {
+                  setResult(coordinateResults(result, Number(next)));
+                }
               }}
             >
               <option value="5">1 m</option>
@@ -160,30 +202,42 @@ export default function PositionConverter({ language }) {
         )}
       </form>
 
-      <div className="output-heading">
-        <h2>{text.outputFormats}</h2>
-        <span>{sourceNote}</span>
-      </div>
-      <div className="coordinate-results" aria-live="polite">
-        {OUTPUT_FORMATS.map(([key, label]) => (
-          <article
-            className={`coordinate-result ${key === "gars" ? "area-result" : ""}`}
-            key={key}
+      {isCurrent && !error && (
+        <>
+          <div className="output-heading">
+            <h2>{text.outputFormats}</h2>
+            <span id="coordinate-source-note">{sourceNote}</span>
+          </div>
+          <div
+            className="coordinate-results"
+            aria-live="polite"
+            aria-describedby="coordinate-source-note"
           >
-            <div>
-              <span>{label}</span>
-              <button
-                type="button"
-                onClick={() => copyOutput(key, result[key])}
+            {OUTPUT_FORMATS.map(([key, label]) => (
+              <article
+                className={`coordinate-result ${key === "gars" ? "area-result" : ""}`}
+                key={key}
               >
-                {copied === key ? text.copied : text.copy}
-              </button>
-            </div>
-            <code>{result[key]}</code>
-            {key === "gars" && <small>{text.areaSource}</small>}
-          </article>
-        ))}
-      </div>
+                <div>
+                  <span>{label}</span>
+                  <button
+                    type="button"
+                    aria-label={`${text.copy} ${label}`}
+                    onClick={() => copyOutput(key, result[key])}
+                  >
+                    {copied === key ? text.copied : text.copy}
+                  </button>
+                </div>
+                <code>{result[key]}</code>
+                <small className="coordinate-resolution">
+                  {resolutionLabel(key, result.resolution?.[key], text)}
+                </small>
+                {key === "gars" && <small>{text.areaSource}</small>}
+              </article>
+            ))}
+          </div>
+        </>
+      )}
 
       <div className="coordinate-examples" aria-label={text.examples}>
         <span>{text.examples}</span>

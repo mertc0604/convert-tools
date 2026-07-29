@@ -1,10 +1,23 @@
 import { fixed, validatePoint } from "../core/numbers.js";
 
 const HEMISPHERE = /[NSEW]/gi;
-const SEPARATORS = /[°ºd:'′’"″s]/gi;
+const SEPARATORS = /[°ºd:'′’"″]/gi;
+const NUMBER_TOKEN = /[+-]?(?:\d+(?:\.\d*)?|\.\d+)/g;
 
 export function parseAngle(value, axis) {
-  const source = String(value).trim().toUpperCase().replace(/,/g, ".");
+  const rawSource = String(value).trim().replace(/,/g, ".");
+  const numberTokens = rawSource.match(NUMBER_TOKEN) ?? [];
+  if (
+    axis === "latitude" &&
+    /s\s*$/i.test(rawSource) &&
+    numberTokens.length >= 3 &&
+    !/["″]\s*s\s*$/i.test(rawSource)
+  ) {
+    throw new Error(
+      "A trailing S after three components is ambiguous. Use a seconds quote before S for south.",
+    );
+  }
+  const source = rawSource.toUpperCase();
   if (!source) throw new Error("Angle is empty.");
 
   const hemispheres = source.match(HEMISPHERE) ?? [];

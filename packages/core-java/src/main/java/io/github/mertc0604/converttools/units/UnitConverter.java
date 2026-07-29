@@ -11,21 +11,48 @@ public final class UnitConverter {
             String toId,
             int precision
     ) {
+        return convert(
+                Rational.parse(input),
+                categoryId,
+                fromId,
+                toId,
+                precision
+        );
+    }
+
+    public static UnitConversion convert(
+            Rational source,
+            String categoryId,
+            String fromId,
+            String toId,
+            int precision
+    ) {
+        if (precision < 0 || precision > 60) {
+            throw new IllegalArgumentException(
+                    "precision must be between 0 and 60."
+            );
+        }
         UnitCategory category = UnitCatalog.category(categoryId);
         UnitDefinition from = category.unit(fromId);
         UnitDefinition to = category.unit(toId);
-        Rational source = Rational.parse(input);
-        Rational base = source.multiply(from.scale()).add(from.offset());
-        Rational result = base.subtract(to.offset()).divide(to.scale());
-        Rational factor = from.scale().divide(to.scale());
+        Rational base = source.multiply(from.metresPerUnit());
+        Rational result = base.divide(to.metresPerUnit());
+        Rational factor = from.metresPerUnit().divide(to.metresPerUnit());
         Integer requiredFractionDigits = result.exactFractionDigits();
+        boolean exactDecimal = requiredFractionDigits != null
+                && requiredFractionDigits <= precision;
 
         return new UnitConversion(
+                result,
+                base,
                 result.format(precision),
-                requiredFractionDigits != null
-                        && requiredFractionDigits <= precision,
+                exactDecimal,
+                !exactDecimal,
                 requiredFractionDigits != null,
                 requiredFractionDigits,
+                precision,
+                "HALF_UP",
+                factor,
                 factor.format(precision),
                 from,
                 to

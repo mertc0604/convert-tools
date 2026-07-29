@@ -1,10 +1,10 @@
 export const COPY = {
   tr: {
     language: "Dil",
-    units: "Birimler",
+    units: "Uzunluk",
     coordinates: "Koordinatlar",
-    unitTitle: "Birim Çevirici",
-    unitSubtitle: "Değeri girin ve birimleri seçin.",
+    unitTitle: "Uzunluk Çevirici",
+    unitSubtitle: "Değeri girin ve iki uzunluk birimini seçin.",
     value: "Değer",
     result: "Sonuç",
     from: "Kaynak birim",
@@ -15,10 +15,12 @@ export const COPY = {
     exact: "Tam sonuç",
     rounded: "24 haneye yuvarlandı",
     rate: "Oran",
+    swapPrecision:
+      "Birimleri değiştirdiğinizde kesin iç değer korunur; gösterim yuvarlaması hesaba geri taşınmaz.",
     examples: "Örnekler",
     examplesHint: "Kullanmak için bir örneğe tıklayın.",
     invalid: "Geçerli bir sayı girin.",
-    unitFooter: "Sonlu birim dönüşümleri kesin kesirlerle hesaplanır.",
+    unitFooter: "Uzunluk dönüşümleri kesin kesir oranlarıyla hesaplanır.",
     coordinateTitle: "Koordinat Çevirici",
     coordinateSubtitle:
       "WGS 84 konum formatları, EPSG dönüşümleri ve elipsoidal mesafe.",
@@ -36,6 +38,9 @@ export const COPY = {
     northing: "Kuzey değeri",
     coordinateValue: "Koordinat",
     outputFormats: "Tüm çıktılar",
+    resolutionCell: "hücre",
+    resolutionMaximum: "çıktı yuvarlaması",
+    resolutionPerAxis: "eksen başına",
     coordinateInvalid:
       "Koordinat okunamadı. Formatı ve değer aralıklarını kontrol edin.",
     wgs84: "Datum: WGS 84",
@@ -46,6 +51,7 @@ export const COPY = {
     sourceCrs: "Kaynak CRS",
     targetCrs: "Hedef CRS",
     transform: "Dönüştür",
+    swapCrs: "Sonucu tersine çevir",
     crsInvalid:
       "Dönüşüm yapılamadı. EPSG kodlarını ve X/Y değerlerini kontrol edin.",
     axisNote:
@@ -72,10 +78,10 @@ export const COPY = {
   },
   en: {
     language: "Language",
-    units: "Units",
+    units: "Length",
     coordinates: "Coordinates",
-    unitTitle: "Unit Converter",
-    unitSubtitle: "Enter a value and select the units.",
+    unitTitle: "Length Converter",
+    unitSubtitle: "Enter a value and select two length units.",
     value: "Value",
     result: "Result",
     from: "From",
@@ -86,10 +92,12 @@ export const COPY = {
     exact: "Exact result",
     rounded: "Rounded to 24 digits",
     rate: "Rate",
+    swapPrecision:
+      "Swapping units preserves the exact internal value; display rounding is not fed back into the calculation.",
     examples: "Examples",
     examplesHint: "Click an example to use it.",
     invalid: "Enter a valid number.",
-    unitFooter: "Finite unit conversions are calculated with exact fractions.",
+    unitFooter: "Length conversions are calculated with exact fractional ratios.",
     coordinateTitle: "Coordinate Converter",
     coordinateSubtitle:
       "WGS 84 position formats, EPSG transformations and ellipsoidal distance.",
@@ -107,6 +115,9 @@ export const COPY = {
     northing: "Northing",
     coordinateValue: "Coordinate",
     outputFormats: "All outputs",
+    resolutionCell: "cell",
+    resolutionMaximum: "output rounding",
+    resolutionPerAxis: "per axis",
     coordinateInvalid:
       "The coordinate could not be read. Check its format and ranges.",
     wgs84: "Datum: WGS 84",
@@ -117,6 +128,7 @@ export const COPY = {
     sourceCrs: "Source CRS",
     targetCrs: "Target CRS",
     transform: "Transform",
+    swapCrs: "Reverse the result",
     crsInvalid:
       "The transformation failed. Check the EPSG codes and X/Y values.",
     axisNote:
@@ -143,19 +155,7 @@ export const COPY = {
   },
 };
 
-export const CATEGORY_LABELS = {
-  en: {
-    length: "Length",
-    speed: "Speed",
-    area: "Area",
-    angle: "Angle",
-    mass: "Mass",
-    pressure: "Pressure",
-    temperature: "Temperature",
-  },
-};
-
-export const UNIT_LABELS = {
+export const LENGTH_UNIT_LABELS = {
   en: {
     millimetre: "Millimetre",
     centimetre: "Centimetre",
@@ -166,79 +166,14 @@ export const UNIT_LABELS = {
     yard: "Yard",
     mile: "Mile",
     "nautical-mile": "Nautical mile",
-    "metre-second": "Metres per second",
-    "kilometre-hour": "Kilometres per hour",
-    knot: "Knot",
-    "mile-hour": "Miles per hour",
-    "foot-second": "Feet per second",
-    "square-metre": "Square metre",
-    hectare: "Hectare",
-    "square-kilometre": "Square kilometre",
-    "square-foot": "Square foot",
-    acre: "Acre",
-    "square-nautical-mile": "Square nautical mile",
-    degree: "Degree",
-    gon: "Gon / grad",
-    "nato-mil": "NATO mil",
-    "wp-mil": "6000 mil",
-    "minute-angle": "Minute of angle",
-    "arc-second": "Arcsecond",
-    milligram: "Milligram",
-    gram: "Gram",
-    kilogram: "Kilogram",
-    tonne: "Metric tonne",
-    ounce: "Ounce",
-    pound: "Pound",
-    pascal: "Pascal",
-    kilopascal: "Kilopascal",
-    hectopascal: "Hectopascal",
-    bar: "Bar",
-    atmosphere: "Standard atmosphere",
-    psi: "Pound per square inch",
-    celsius: "Celsius",
-    kelvin: "Kelvin",
-    fahrenheit: "Fahrenheit",
-    rankine: "Rankine",
   },
 };
 
-export const UNIT_EXAMPLES = {
-  length: [
-    { value: "1", from: "nautical-mile", to: "metre" },
-    { value: "1", from: "foot", to: "metre" },
-    { value: "1", from: "mile", to: "kilometre" },
-  ],
-  speed: [
-    { value: "1", from: "knot", to: "metre-second" },
-    { value: "100", from: "kilometre-hour", to: "metre-second" },
-    { value: "60", from: "mile-hour", to: "kilometre-hour" },
-  ],
-  area: [
-    { value: "1", from: "square-nautical-mile", to: "square-kilometre" },
-    { value: "1", from: "hectare", to: "square-metre" },
-    { value: "1", from: "acre", to: "square-metre" },
-  ],
-  angle: [
-    { value: "1600", from: "nato-mil", to: "degree" },
-    { value: "1500", from: "wp-mil", to: "degree" },
-    { value: "60", from: "minute-angle", to: "degree" },
-  ],
-  mass: [
-    { value: "1", from: "pound", to: "kilogram" },
-    { value: "1", from: "kilogram", to: "gram" },
-    { value: "1", from: "ounce", to: "gram" },
-  ],
-  pressure: [
-    { value: "1", from: "bar", to: "kilopascal" },
-    { value: "1", from: "atmosphere", to: "kilopascal" },
-    { value: "30", from: "psi", to: "bar" },
-  ],
-  temperature: [
-    { value: "0", from: "celsius", to: "fahrenheit" },
-    { value: "32", from: "fahrenheit", to: "celsius" },
-    { value: "0", from: "celsius", to: "kelvin" },
-  ],
-};
+export const LENGTH_EXAMPLES = [
+  { value: "1", from: "nautical-mile", to: "metre" },
+  { value: "1", from: "foot", to: "metre" },
+  { value: "1", from: "mile", to: "kilometre" },
+];
 
 export const COORDINATE_FORMATS = [
   { id: "dd", label: "DD" },

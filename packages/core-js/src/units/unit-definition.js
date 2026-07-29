@@ -15,10 +15,6 @@ export function linearUnit(id, label, symbol, scale, detail) {
   return createUnit(id, label, symbol, scale, "0", detail);
 }
 
-export function affineUnit(id, label, symbol, scale, offset, detail) {
-  return createUnit(id, label, symbol, scale, offset, detail);
-}
-
 export function unitCategory(id, label, defaultFrom, defaultTo, units) {
   return Object.freeze({
     id,

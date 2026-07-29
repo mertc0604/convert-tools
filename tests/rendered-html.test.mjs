@@ -22,7 +22,7 @@ async function render() {
   );
 }
 
-test("Birim ve koordinat çevirici arayüzünü sunucu tarafında oluşturur", async () => {
+test("Uzunluk ve koordinat arayüzünü sunucu tarafında oluşturur", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
@@ -30,12 +30,14 @@ test("Birim ve koordinat çevirici arayüzünü sunucu tarafında oluşturur", a
   const html = await response.text();
   assert.match(
     html,
-    /<title>Convert — Birim ve Koordinat Çevirici<\/title>/i,
+    /<title>Convert — Uzunluk ve Koordinat Çevirici<\/title>/i,
   );
   assert.match(html, />CONVERT</);
-  assert.match(html, /Birim Çevirici/);
+  assert.match(html, /Uzunluk Çevirici/);
+  assert.match(html, /kesin iç değer korunur/);
   assert.match(html, /aria-label="English"/);
   assert.match(html, /Örnekler/);
   assert.match(html, /Koordinatlar/);
+  assert.doesNotMatch(html, />Hız<|>Alan<|>Açı<|>Kütle<|>Basınç<|>Sıcaklık</);
   assert.doesNotMatch(html, /SAHA CONVERT|react-loading-skeleton/i);
 });

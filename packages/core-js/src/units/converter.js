@@ -4,10 +4,13 @@ import {
   exactFractionDigits,
   formatRational,
   multiplyRational,
-  parseDecimal,
+  rationalToJson,
   subtractRational,
+  toRational,
 } from "../exact/rational.js";
 import { getCategory, getUnit } from "./registry.js";
+
+const ROUNDING_MODE = "HALF_UP";
 
 export function convertUnits(
   input,
@@ -27,7 +30,7 @@ export function convertUnits(
     throw new Error(`Unknown unit in category ${categoryId}.`);
   }
 
-  const source = parseDecimal(input);
+  const source = toRational(input);
   const base = addRational(
     multiplyRational(source, from.scale),
     from.offset,
@@ -38,19 +41,32 @@ export function convertUnits(
   );
   const factor = divideRational(from.scale, to.scale);
   const requiredFractionDigits = exactFractionDigits(result);
+  const value = formatRational(result, precision);
+  const formattedFactor = formatRational(factor, precision);
+  const exactDecimal =
+    requiredFractionDigits !== null &&
+    requiredFractionDigits <= precision;
 
   return {
     rational: result,
-    value: formatRational(result, precision),
-    exactDecimal:
-      requiredFractionDigits !== null &&
-      requiredFractionDigits <= precision,
+    value,
+    exactValue: rationalToJson(result),
+    exactMetres: categoryId === "length" ? rationalToJson(base) : null,
+    exactFactor: rationalToJson(factor),
+    exactDecimal,
+    rounded: !exactDecimal,
     terminatingDecimal: requiredFractionDigits !== null,
     requiredFractionDigits,
-    factor: formatRational(factor, precision),
+    precision,
+    roundingMode: ROUNDING_MODE,
+    factor: formattedFactor,
     from,
     to,
   };
+}
+
+export function convertLength(input, fromId, toId, precision = 24) {
+  return convertUnits(input, "length", fromId, toId, precision);
 }
 
 export function convertToAll(input, categoryId, fromId, precision = 18) {

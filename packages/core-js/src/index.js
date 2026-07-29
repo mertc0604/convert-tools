@@ -1,11 +1,14 @@
 export {
   UNIT_CATEGORIES,
+  convertLength,
   convertToAll,
   convertUnits,
   formatRational,
   getCategory,
   getUnit,
   parseDecimal,
+  rationalToJson,
+  toRational,
 } from "./units/index.js";
 export {
   WGS84,

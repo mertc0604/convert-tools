@@ -22,13 +22,11 @@ export default function CoordinateConverter({ language }) {
         </div>
         <div
           className="subtabs"
-          role="tablist"
           aria-label={text.coordinateTitle}
         >
           <button
             type="button"
-            role="tab"
-            aria-selected={mode === "formats"}
+            aria-pressed={mode === "formats"}
             className={mode === "formats" ? "active" : ""}
             onClick={() => setMode("formats")}
           >
@@ -36,8 +34,7 @@ export default function CoordinateConverter({ language }) {
           </button>
           <button
             type="button"
-            role="tab"
-            aria-selected={mode === "crs"}
+            aria-pressed={mode === "crs"}
             className={mode === "crs" ? "active" : ""}
             onClick={() => setMode("crs")}
           >
@@ -45,8 +42,7 @@ export default function CoordinateConverter({ language }) {
           </button>
           <button
             type="button"
-            role="tab"
-            aria-selected={mode === "distance"}
+            aria-pressed={mode === "distance"}
             className={mode === "distance" ? "active" : ""}
             onClick={() => setMode("distance")}
           >

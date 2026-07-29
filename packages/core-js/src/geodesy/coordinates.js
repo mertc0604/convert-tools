@@ -17,12 +17,18 @@ import {
   fixed,
   parseCoordinateNumber,
   pointFromValues,
-  validatePoint,
 } from "./core/numbers.js";
 import {
   utmUpsForward,
   utmUpsInverse,
 } from "./projections/utm-ups.js";
+
+const DD_DIGITS = 10;
+const DMS_SECOND_DIGITS = 5;
+const DDM_MINUTE_DIGITS = 7;
+const GRID_METRE_DIGITS = 3;
+const GARS_CELL_DEGREES = 1 / 12;
+const GEOREF_PRECISION = 4;
 
 function pointSource(point) {
   return { ...point, sourceKind: "point" };
@@ -93,7 +99,7 @@ export function fromGeoref(value) {
 }
 
 export function coordinateResults(point, mgrsPrecision = 5) {
-  const { latitude, longitude } = validatePoint(
+  const { latitude, longitude } = pointFromValues(
     point.latitude,
     point.longitude,
   );
@@ -107,16 +113,66 @@ export function coordinateResults(point, mgrsPrecision = 5) {
     grid.zone === 0
       ? `UPS ${grid.north ? "N" : "S"}`
       : `${grid.zone}${grid.north ? "N" : "S"}`;
+  const ddStepDegrees = 10 ** -DD_DIGITS;
+  const dmsStepDegrees = 10 ** -DMS_SECOND_DIGITS / 3600;
+  const ddmStepDegrees = 10 ** -DDM_MINUTE_DIGITS / 60;
+  const mgrsCellMetres = 10 ** (5 - precision);
+  const gridStepMetres = 10 ** -GRID_METRE_DIGITS;
+  const georefCellDegrees =
+    10 ** (2 - GEOREF_PRECISION) / 60;
   return {
     latitude,
     longitude,
-    dd: `${fixed(latitude, 10)}, ${fixed(longitude, 10)}`,
-    dms: `${formatDms(latitude, "latitude")}  ${formatDms(longitude, "longitude")}`,
-    ddm: `${formatDdm(latitude, "latitude")}  ${formatDdm(longitude, "longitude")}`,
+    dd: `${fixed(latitude, DD_DIGITS)}, ${fixed(longitude, DD_DIGITS)}`,
+    dms: `${formatDms(latitude, "latitude", DMS_SECOND_DIGITS)}  ${formatDms(longitude, "longitude", DMS_SECOND_DIGITS)}`,
+    ddm: `${formatDdm(latitude, "latitude", DDM_MINUTE_DIGITS)}  ${formatDdm(longitude, "longitude", DDM_MINUTE_DIGITS)}`,
     mgrs: formatMgrs(encodeMgrs(latitude, longitude, precision)),
-    utmUps: `${gridPrefix}  ${fixed(grid.easting, 3)} E  ${fixed(grid.northing, 3)} N`,
+    utmUps: `${gridPrefix}  ${fixed(grid.easting, GRID_METRE_DIGITS)} E  ${fixed(grid.northing, GRID_METRE_DIGITS)} N`,
     gars: encodeGars(longitude, latitude),
-    georef: encodeGeoref(longitude, latitude, 4),
+    georef: encodeGeoref(longitude, latitude, GEOREF_PRECISION),
+    resolution: {
+      dd: {
+        kind: "angular-rounding",
+        stepDegrees: ddStepDegrees,
+        maximumErrorDegrees: ddStepDegrees / 2,
+      },
+      dms: {
+        kind: "angular-rounding",
+        stepDegrees: dmsStepDegrees,
+        maximumErrorDegrees: dmsStepDegrees / 2,
+      },
+      ddm: {
+        kind: "angular-rounding",
+        stepDegrees: ddmStepDegrees,
+        maximumErrorDegrees: ddmStepDegrees / 2,
+      },
+      mgrs: {
+        kind: "grid-cell",
+        cellMetres: mgrsCellMetres,
+        decodedPoint: "cell-center",
+        maximumCenterOffsetMetres:
+          mgrsCellMetres * Math.SQRT1_2,
+      },
+      utmUps: {
+        kind: "grid-rounding",
+        stepMetres: gridStepMetres,
+        maximumErrorMetresPerAxis: gridStepMetres / 2,
+      },
+      gars: {
+        kind: "angular-cell",
+        cellDegrees: GARS_CELL_DEGREES,
+        decodedPoint: "cell-center",
+        maximumCenterOffsetDegreesPerAxis:
+          GARS_CELL_DEGREES / 2,
+      },
+      georef: {
+        kind: "angular-cell",
+        cellDegrees: georefCellDegrees,
+        decodedPoint: "cell-center",
+        maximumCenterOffsetDegreesPerAxis:
+          georefCellDegrees / 2,
+      },
+    },
     sourceKind: point.sourceKind ?? "point",
     sourceCellMetres: point.sourceCellMetres,
     sourceCellDegrees: point.sourceCellDegrees,

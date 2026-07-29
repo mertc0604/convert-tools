@@ -115,6 +115,42 @@ test("inverse and direct geodesic calculations round-trip", async () => {
   }
 });
 
+test("geodesic distance is symmetric and direct reconstruction stays within 1 mm", () => {
+  let seed = 0x5a17c9e3;
+  const random = () => {
+    seed = (1664525 * seed + 1013904223) >>> 0;
+    return seed / 2 ** 32;
+  };
+
+  for (let index = 0; index < 250; index += 1) {
+    const start = {
+      latitude: -89 + random() * 178,
+      longitude: -180 + random() * 360,
+    };
+    const end = {
+      latitude: -89 + random() * 178,
+      longitude: -180 + random() * 360,
+    };
+    const forward = inverseGeodesic(start, end);
+    const reverse = inverseGeodesic(end, start);
+    assert.ok(
+      Math.abs(forward.distanceMetres - reverse.distanceMetres) <= 0.001,
+      `distance symmetry ${index}`,
+    );
+
+    const destination = directGeodesic(
+      start,
+      forward.initialBearingDegrees,
+      forward.distanceMetres,
+    );
+    const reconstructionError = inverseGeodesic(destination, end);
+    assert.ok(
+      reconstructionError.distanceMetres <= 0.001,
+      `direct reconstruction ${index}: ${reconstructionError.distanceMetres} m`,
+    );
+  }
+});
+
 test("coincident points have zero distance and no azimuth", () => {
   const point = { latitude: 39.933365, longitude: 32.859742 };
   const result = inverseGeodesic(point, point);
