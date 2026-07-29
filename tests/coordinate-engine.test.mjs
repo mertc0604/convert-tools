@@ -330,13 +330,17 @@ test("çıktılar yuvarlama ve hücre çözünürlüklerini açıkça bildirir",
     stepDegrees: 1e-10,
     maximumErrorDegrees: 5e-11,
   });
-  assert.equal(
+  closeTo(
     result.resolution.dms.stepDegrees,
     1e-5 / 3600,
+    1e-23,
+    "DMS resolution",
   );
-  assert.equal(
+  closeTo(
     result.resolution.ddm.stepDegrees,
     1e-7 / 60,
+    1e-23,
+    "DDM resolution",
   );
   assert.deepEqual(result.resolution.mgrs, {
     kind: "grid-cell",
