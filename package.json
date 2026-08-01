@@ -39,7 +39,7 @@
     "vinext": "0.0.50",
     "vite": "8.1.5",
     "vite-plugin-static-copy": "4.1.1",
-    "wrangler": "4.114.0"
+    "wrangler": "4.115.0"
   },
   "type": "module"
 }
