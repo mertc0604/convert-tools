@@ -1,5 +1,6 @@
-const BOUNDARIES_URL = "/map-data/world-boundaries.geojson";
-const LABELS_URL = "/map-data/world-labels.geojson";
+const APP_BASE_URL = import.meta.env.BASE_URL;
+const BOUNDARIES_URL = `${APP_BASE_URL}map-data/world-boundaries.geojson`;
+const LABELS_URL = `${APP_BASE_URL}map-data/world-labels.geojson`;
 const COUNTRY_LABEL_MINIMUM_DISTANCE_METRES = 1_200_000;
 
 function cityMaximumDistance(rank) {

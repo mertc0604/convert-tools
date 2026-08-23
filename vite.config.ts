@@ -26,6 +26,7 @@ export default defineConfig(async () => {
   const { cloudflare } = await import("@cloudflare/vite-plugin");
 
   return {
+    base: process.env.VITE_BASE_PATH ?? "/",
     plugins: [
       vinext(),
       viteStaticCopy({

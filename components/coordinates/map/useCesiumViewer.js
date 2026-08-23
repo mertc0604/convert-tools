@@ -9,7 +9,8 @@ import {
   renderMeasurement,
 } from "./cesium-adapter";
 
-const CESIUM_MODULE_URL = "/cesium/index.js";
+const APP_BASE_URL = import.meta.env.BASE_URL;
+const CESIUM_MODULE_URL = `${APP_BASE_URL}cesium/index.js`;
 
 function prefersReducedMotion() {
   return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ??
@@ -74,7 +75,7 @@ export default function useCesiumViewer({
 
     async function initialise() {
       try {
-        window.CESIUM_BASE_URL = "/cesium/";
+        window.CESIUM_BASE_URL = `${APP_BASE_URL}cesium/`;
         const Cesium = await import(
           /* @vite-ignore */ CESIUM_MODULE_URL
         );
