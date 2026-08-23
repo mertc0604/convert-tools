@@ -1,5 +1,10 @@
+import { addReferenceOverlay } from "./reference-overlay";
+
 const ROUTE_HEIGHT_METRES = 100;
 const MINIMUM_CAMERA_RANGE_METRES = 120_000;
+const ESRI_WORLD_IMAGERY_URL =
+  "https://services.arcgisonline.com/ArcGIS/rest/services/" +
+  "World_Imagery/MapServer";
 
 function cartesianPosition(Cesium, point) {
   return Cesium.Cartesian3.fromDegrees(
@@ -55,13 +60,34 @@ export async function createCesiumViewer(Cesium, container) {
     timeline: false,
   });
 
+  viewer.useBrowserRecommendedResolution = false;
   viewer.scene.requestRenderMode = true;
   viewer.scene.maximumRenderTimeChange = Number.POSITIVE_INFINITY;
   viewer.scene.globe.depthTestAgainstTerrain = false;
   viewer.canvas.tabIndex = -1;
   viewer.canvas.setAttribute("aria-hidden", "true");
 
+  await addReferenceOverlay(Cesium, viewer);
+
   return viewer;
+}
+
+export async function addSatelliteImagery(Cesium, viewer) {
+  const imageryProvider =
+    await Cesium.ArcGisMapServerImageryProvider.fromUrl(
+      ESRI_WORLD_IMAGERY_URL,
+      {
+        enablePickFeatures: false,
+      },
+    );
+
+  if (!viewer || viewer.isDestroyed()) return null;
+
+  const layer = viewer.imageryLayers.add(
+    new Cesium.ImageryLayer(imageryProvider),
+  );
+  viewer.scene.requestRender();
+  return layer;
 }
 
 export function createMeasurementDataSource(Cesium) {

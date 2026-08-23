@@ -21,7 +21,13 @@ export default function GeodesicMap({
     () => ({ start: "A", end: "B" }),
     [],
   );
-  const { containerRef, fitPath, phase } = useCesiumViewer({
+  const {
+    containerRef,
+    enableSatelliteMap,
+    fitPath,
+    imageryPhase,
+    phase,
+  } = useCesiumViewer({
     start,
     end,
     points,
@@ -60,7 +66,36 @@ export default function GeodesicMap({
       <div className="map-model-badges" aria-label={text.mapModel}>
         <span>WGS 84</span>
         <span>{text.mapNoTerrain}</span>
+        <a
+          href="https://www.naturalearthdata.com/"
+          target="_blank"
+          rel="noreferrer"
+        >
+          {text.mapSource}
+        </a>
+        <button
+          className="map-source-button"
+          type="button"
+          onClick={enableSatelliteMap}
+          disabled={
+            phase !== "ready" ||
+            imageryPhase === "loading" ||
+            imageryPhase === "satellite"
+          }
+          aria-describedby="map-source-disclosure"
+        >
+          {imageryPhase === "loading"
+            ? text.mapSatelliteLoading
+            : imageryPhase === "satellite"
+              ? text.mapSatelliteEnabled
+              : imageryPhase === "error"
+                ? text.mapSatelliteRetry
+                : text.mapSatelliteEnable}
+        </button>
       </div>
+      <p className="map-source-disclosure" id="map-source-disclosure">
+        {text.mapSatelliteDisclosure}
+      </p>
 
       <div className="geodesic-map-frame">
         <div className="geodesic-map-image" role="img" aria-label={summary}>

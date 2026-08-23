@@ -841,13 +841,43 @@ footer {
   margin-bottom: 9px;
 }
 
-.map-model-badges span {
+.map-model-badges span,
+.map-model-badges a,
+.map-model-badges button {
   padding: 4px 7px;
+  border: 0;
   border-radius: 6px;
   background: var(--accent-soft);
   color: var(--accent);
+  font-family: inherit;
   font-size: 9px;
   font-weight: 750;
+}
+
+.map-model-badges a:hover,
+.map-model-badges button:not(:disabled):hover {
+  text-decoration: underline;
+}
+
+.map-model-badges button {
+  cursor: pointer;
+}
+
+.map-model-badges .map-source-button {
+  background: var(--accent);
+  color: #fff;
+}
+
+.map-model-badges button:disabled {
+  cursor: default;
+  opacity: 0.78;
+}
+
+.map-source-disclosure {
+  margin: -4px 0 9px;
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.35;
 }
 
 .geodesic-map-frame {

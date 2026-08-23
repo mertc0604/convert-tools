@@ -292,10 +292,15 @@ Bu değer elipsoit yüzey mesafesidir. Şunlarla aynı değildir:
 - rhumb line / sabit kerteriz yolu
 - rakım içeren 3B eğik mesafe
 
-Uygulamadaki Cesium görünümü, çekirdeğin örneklediği hattı yerel Natural Earth
-altlığı üzerinde gösterir. Cesium ölçüm yapmaz; sonuçları değiştirmez. Araziye
-oturtma ve yükseklik hesabı özellikle kapalıdır, dolayısıyla çizgi WGS 84
-elipsoit yüzey ölçümünü temsil eder.
+Uygulamadaki Cesium görünümü, çekirdeğin örneklediği hattı paketle gelen
+Natural Earth altlığı üzerinde gösterir. Ayrıca Natural Earth 1:10m ülke
+sınırları ile ölçeğe göre açılan ülke ve büyük şehir adları yerel vektör
+katmanları olarak çizilir. Harita verisi için dış servise istek atılmaz.
+Kullanıcı isterse Cesium'un resmî entegrasyon örneğinde gösterilen Esri World
+Imagery uydu katmanını açıkça etkinleştirebilir; bu durumda yalnız görüntülenen
+harita karoları Esri'den alınır. Cesium ölçüm yapmaz; sonuçları değiştirmez.
+Araziye oturtma ve yükseklik hesabı özellikle kapalıdır, dolayısıyla çizgi
+WGS 84 elipsoit yüzey ölçümünü temsil eder.
 
 Sayısal doğruluk, kaynak koordinatın veya sensörün gerçek dünya doğruluğunu
 artırmaz. Operasyonel kullanımda datum, yükseklik modeli, cihaz hatası ve

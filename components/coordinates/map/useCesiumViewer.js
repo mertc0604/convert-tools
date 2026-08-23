@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  addSatelliteImagery,
   createCesiumViewer,
   createMeasurementDataSource,
   fitMeasurement,
@@ -26,9 +27,12 @@ export default function useCesiumViewer({
   const dataSourceRef = useRef(null);
   const cesiumRef = useRef(null);
   const positionsRef = useRef([]);
+  const satelliteLayerRef = useRef(null);
+  const satelliteRequestRef = useRef(null);
   const latestRef = useRef({ start, end, points, labels });
   const previousPointsRef = useRef(null);
   const [phase, setPhase] = useState("loading");
+  const [imageryPhase, setImageryPhase] = useState("local");
 
   useEffect(() => {
     latestRef.current = { start, end, points, labels };
@@ -115,6 +119,8 @@ export default function useCesiumViewer({
       dataSourceRef.current = null;
       cesiumRef.current = null;
       positionsRef.current = [];
+      satelliteLayerRef.current = null;
+      satelliteRequestRef.current = null;
     };
   }, [updateMap]);
 
@@ -137,9 +143,41 @@ export default function useCesiumViewer({
     );
   }, []);
 
+  const enableSatelliteMap = useCallback(async () => {
+    const Cesium = cesiumRef.current;
+    const viewer = viewerRef.current;
+    if (
+      !Cesium ||
+      !viewer ||
+      viewer.isDestroyed() ||
+      satelliteLayerRef.current ||
+      satelliteRequestRef.current
+    ) {
+      return;
+    }
+
+    setImageryPhase("loading");
+    const request = addSatelliteImagery(Cesium, viewer);
+    satelliteRequestRef.current = request;
+
+    try {
+      const layer = await request;
+      if (!layer || viewer.isDestroyed()) return;
+      satelliteLayerRef.current = layer;
+      setImageryPhase("satellite");
+    } catch (error) {
+      console.error("Satellite imagery failed to load.", error);
+      setImageryPhase("error");
+    } finally {
+      satelliteRequestRef.current = null;
+    }
+  }, []);
+
   return {
     containerRef,
+    enableSatelliteMap,
     fitPath,
+    imageryPhase,
     phase,
   };
 }

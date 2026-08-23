@@ -239,7 +239,7 @@ export default function DistanceCalculator({ language }) {
                     <dd>{measurement.path.segmentCount}</dd>
                   </div>
                   <div>
-                    <dt>Google Maps</dt>
+                    <dt>{text.sphericalComparison}</dt>
                     <dd>{text.googleSphereDifference}</dd>
                   </div>
                 </dl>

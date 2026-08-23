@@ -83,7 +83,9 @@ export const COPY = {
     solver: "Çözücü",
     iterations: "İterasyon",
     mapSegments: "Çizgi parçası",
-    googleSphereDifference: "küresel model; sonuç farklı olabilir",
+    sphericalComparison: "Küresel harita ölçümleri",
+    googleSphereDifference:
+      "ortalama yarıçaplı küre; WGS 84 elipsoidi değildir",
     ambiguousPath:
       "Bu iki nokta için en kısa yol tek değildir. Haritada kararlı bir temsil yolu gösterilir.",
     mapTitle: "Ölçüm haritası",
@@ -92,6 +94,13 @@ export const COPY = {
     mapFit: "Hattı göster",
     mapModel: "Hesaplama modeli",
     mapNoTerrain: "Arazi yüksekliği hariç",
+    mapSource: "Natural Earth · yerel veri",
+    mapSatelliteEnable: "Net uyduyu aç",
+    mapSatelliteLoading: "Uydu yükleniyor…",
+    mapSatelliteEnabled: "Esri uydu açık",
+    mapSatelliteRetry: "Uyduyu yeniden dene",
+    mapSatelliteDisclosure:
+      "Uydu katmanı açılırsa görüntülenen alan Esri World Imagery üzerinden yüklenir.",
     mapLoading: "Harita hazırlanıyor…",
     mapUnavailable:
       "Harita görüntülenemedi. Mesafe hesaplama kullanılmaya devam edebilir.",
@@ -100,7 +109,7 @@ export const COPY = {
     mapEnd: "Bitiş B",
     mapDistance: "Elipsoidal mesafe",
     coordinateFooter:
-      "Dönüşümler ve ölçümler çevrimdışı çalışır; sonuçlar kullanım amacına uygun kaynakla doğrulanmalıdır.",
+      "Dönüşümler, ölçümler ve harita verisi cihazda çevrimdışı çalışır.",
   },
   en: {
     language: "Language",
@@ -186,7 +195,9 @@ export const COPY = {
     solver: "Solver",
     iterations: "Iterations",
     mapSegments: "Line segments",
-    googleSphereDifference: "spherical model; results can differ",
+    sphericalComparison: "Spherical map measurements",
+    googleSphereDifference:
+      "mean-radius sphere; not the WGS 84 ellipsoid",
     ambiguousPath:
       "The shortest path is not unique for these points. The map shows a stable representative path.",
     mapTitle: "Measurement map",
@@ -195,6 +206,13 @@ export const COPY = {
     mapFit: "Show line",
     mapModel: "Calculation model",
     mapNoTerrain: "Terrain elevation excluded",
+    mapSource: "Natural Earth · local data",
+    mapSatelliteEnable: "Enable clear satellite",
+    mapSatelliteLoading: "Loading satellite…",
+    mapSatelliteEnabled: "Esri satellite enabled",
+    mapSatelliteRetry: "Retry satellite",
+    mapSatelliteDisclosure:
+      "When enabled, the viewed area is loaded through Esri World Imagery.",
     mapLoading: "Preparing the map…",
     mapUnavailable:
       "The map could not be displayed. Distance calculation remains available.",
@@ -203,7 +221,7 @@ export const COPY = {
     mapEnd: "End B",
     mapDistance: "Ellipsoidal distance",
     coordinateFooter:
-      "Conversions and measurements work offline; verify results against a source appropriate for the intended use.",
+      "Conversions, measurements, and map data run locally and offline.",
   },
 };
 
