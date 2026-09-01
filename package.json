@@ -19,7 +19,7 @@
   },
   "dependencies": {
     "@convert-tools/core": "workspace:*",
-    "cesium": "1.143.0",
+    "cesium": "1.144.0",
     "next": "16.2.12",
     "react": "19.2.8",
     "react-dom": "19.2.8"
